@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
 
 // ===== ХРАНИЛИЩЕ =====
@@ -1003,6 +1003,15 @@ function renderCharacters() {
   }
 }
 
+let arcListExpandedState = new Map();
+
+document.addEventListener('click', e => {
+  const menu = document.getElementById('charPhotoMenu');
+  if (!menu || menu.hidden) return;
+  if (e.target.closest('.char-photo-wrap')) return;
+  menu.hidden = true;
+});
+
 function renderCharacterDetail() {
   const p = currentProject();
   const c = p.characters.find(x => x.id === activeCharacterId);
@@ -1028,15 +1037,22 @@ function renderCharacterDetail() {
     </div>
   `).join('') || '<p class="hint">В проекте пока нет глав.</p>';
 
+  const ARC_COLLAPSE_THRESHOLD = 5;
+  const arcFilledCount = p.chapters.filter(ch => c.arcNotes[ch.id]).length;
+  const arcDefaultExpanded = p.chapters.length <= ARC_COLLAPSE_THRESHOLD;
+  const arcExpanded = arcListExpandedState.has(c.id) ? arcListExpandedState.get(c.id) : arcDefaultExpanded;
+
   const relRows = c.relationships.map(r => `
     <div class="rel-row" data-rel-id="${r.id}">
-      <select class="rel-target">
-        <option value="">— выберите персонажа —</option>
-        ${otherChars.map(oc => `<option value="${oc.id}" ${r.targetCharacterId === oc.id ? 'selected' : ''}>${escapeHtml(oc.name || 'Без имени')}</option>`).join('')}
-      </select>
-      <input class="rel-type" placeholder="Тип отношений (друг, враг, родственник...)" value="${escapeAttr(r.relationType)}">
+      <div class="rel-row-head">
+        <select class="rel-target">
+          <option value="">— выберите персонажа —</option>
+          ${otherChars.map(oc => `<option value="${oc.id}" ${r.targetCharacterId === oc.id ? 'selected' : ''}>${escapeHtml(oc.name || 'Без имени')}</option>`).join('')}
+        </select>
+        <input class="rel-type" placeholder="Тип отношений (друг, враг, родственник...)" value="${escapeAttr(r.relationType)}">
+        <button class="rel-del" title="Удалить связь">✕</button>
+      </div>
       <textarea class="rel-desc" placeholder="Описание отношений">${escapeHtml(r.description)}</textarea>
-      <button class="rel-del">Удалить связь</button>
     </div>
   `).join('') || '<p class="hint">Связей пока нет.</p>';
 
@@ -1053,22 +1069,27 @@ function renderCharacterDetail() {
 
   detailEl.innerHTML = `
     <button type="button" id="characterBackBtn" class="mobile-back-btn">← Назад к списку</button>
-    <div class="char-photo-row">
-      <img id="charPhotoPreview" class="char-photo-preview" src="${c.appearance.photo || ''}" style="display:${c.appearance.photo ? 'block' : 'none'}">
-      <div class="char-photo-actions">
-        <button id="charPhotoBtn" type="button">📷 Загрузить фото</button>
-        <button id="charPhotoRemoveBtn" type="button" style="display:${c.appearance.photo ? 'inline-block' : 'none'}">Удалить фото</button>
+    <div class="char-dossier-header">
+      <div class="char-photo-wrap">
+        <img id="charPhotoPreview" class="char-photo-preview" src="${c.appearance.photo || ''}" style="display:${c.appearance.photo ? 'block' : 'none'}">
+        ${!c.appearance.photo ? '<div id="charPhotoPlaceholder" class="char-photo-placeholder">👤</div>' : ''}
+        <button id="charPhotoMenuBtn" type="button" class="char-photo-menu-btn" title="Действия с фото">⋮</button>
+        <div id="charPhotoMenu" class="char-photo-menu" hidden>
+          <button id="charPhotoBtn" type="button">📷 Загрузить фото</button>
+          <button id="charPhotoRemoveBtn" type="button" style="display:${c.appearance.photo ? 'block' : 'none'}">🗑 Удалить фото</button>
+        </div>
         <input type="file" id="charPhotoInput" accept="image/*" hidden>
       </div>
-    </div>
+      <div class="char-dossier-fields">
+        <input id="charName" placeholder="Имя" value="${escapeAttr(c.name)}">
+        <input id="charRole" placeholder="Роль (протагонист, антагонист...)" value="${escapeAttr(c.role)}">
 
-    <input id="charName" placeholder="Имя" value="${escapeAttr(c.name)}">
-    <input id="charRole" placeholder="Роль (протагонист, антагонист...)" value="${escapeAttr(c.role)}">
-
-    <label class="field-label">Группы (клан, гильдия, фракция...)</label>
-    <div class="note-tags-editor" id="charGroupsChips">
-      ${groupsChipsHtml}
-      <input id="charGroupInput" placeholder="Добавить группу и нажать Enter">
+        <label class="field-label">Группы (клан, гильдия, фракция...)</label>
+        <div class="note-tags-editor" id="charGroupsChips">
+          ${groupsChipsHtml}
+          <input id="charGroupInput" placeholder="Добавить группу и нажать Enter">
+        </div>
+      </div>
     </div>
 
     <label class="field-label">Внешность (описание)</label>
@@ -1087,8 +1108,11 @@ function renderCharacterDetail() {
     <textarea id="charSpeech" class="char-textarea" placeholder="Манера речи, лексика, акцент...">${escapeHtml(c.speech)}</textarea>
 
     <div class="char-section">
-      <h3>Арка — заметки по главам</h3>
-      <div id="charArcList">${arcRows}</div>
+      <div class="char-section-header">
+        <h3>Арка — заметки по главам${p.chapters.length ? `<span class="arc-section-summary">(${arcFilledCount} из ${p.chapters.length})</span>` : ''}</h3>
+        ${p.chapters.length ? `<button id="arcToggleBtn" type="button" class="icon-btn" title="${arcExpanded ? 'Свернуть' : 'Развернуть'}">${arcExpanded ? '▼' : '▶'}</button>` : ''}
+      </div>
+      <div id="charArcList" style="display:${arcExpanded ? 'block' : 'none'}">${arcRows}</div>
     </div>
 
     <div class="char-section">
@@ -1137,7 +1161,13 @@ function renderCharacterDetail() {
   document.getElementById('charGoals').addEventListener('input', e => { c.goals = e.target.value; persist(); });
   document.getElementById('charSpeech').addEventListener('input', e => { c.speech = e.target.value; persist(); });
 
+  document.getElementById('charPhotoMenuBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    const menu = document.getElementById('charPhotoMenu');
+    menu.hidden = !menu.hidden;
+  });
   document.getElementById('charPhotoBtn').addEventListener('click', () => {
+    document.getElementById('charPhotoMenu').hidden = true;
     document.getElementById('charPhotoInput').click();
   });
   document.getElementById('charPhotoInput').addEventListener('change', e => {
@@ -1157,6 +1187,14 @@ function renderCharacterDetail() {
     persist();
     renderCharacterDetail();
   });
+
+  const arcToggleBtn = document.getElementById('arcToggleBtn');
+  if (arcToggleBtn) {
+    arcToggleBtn.addEventListener('click', () => {
+      arcListExpandedState.set(c.id, !arcExpanded);
+      renderCharacterDetail();
+    });
+  }
 
   detailEl.querySelectorAll('.arc-note').forEach(el => {
     el.addEventListener('input', e => {
