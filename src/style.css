@@ -200,6 +200,56 @@ button:disabled {
 }
 .list li .del:hover { opacity: 1; }
 
+.list li.chapter-item.indented { margin-left: 16px; }
+
+.list li.chapter-part-header {
+  cursor: default;
+  background: var(--panel-2);
+  gap: 8px;
+}
+
+.chapter-part-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.part-name-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0;
+}
+.part-name-input:focus { outline: none; }
+
+.chapter-meta-row {
+  display: flex;
+  gap: 16px;
+}
+
+.chapter-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chapter-meta-field select { width: 200px; }
+
+.chapter-meta-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.chapter-number-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chapter-number-row input { width: 100px; margin-bottom: 0; }
+
 .editor {
   flex: 1;
   display: flex;

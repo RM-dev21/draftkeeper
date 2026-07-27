@@ -60,6 +60,7 @@
         <h2>Главы</h2>
         <div class="panel-header-actions">
           <button id="exportNovelWordBtn">📚 Экспорт всего романа в Word</button>
+          <button id="addPartBtn" type="button">+ Часть</button>
           <button id="addChapterBtn">+ Новая глава</button>
         </div>
       </div>
@@ -78,7 +79,22 @@
               <button id="showVersionsBtn" type="button">🕐 История версий</button>
               <button id="exportChapterWordBtn" type="button">📄 Экспорт в Word</button>
             </div>
+            <div class="chapter-meta-row">
+              <label class="chapter-meta-field">
+                <span class="chapter-meta-label">№ главы</span>
+                <div class="chapter-number-row">
+                  <input id="chapterNumber" type="number" min="1" step="1" placeholder="без номера">
+                  <button id="chapterNumberClearBtn" type="button" class="icon-btn" title="Убрать номер">✕</button>
+                </div>
+              </label>
+              <label class="chapter-meta-field">
+                <span class="chapter-meta-label">Часть</span>
+                <select id="chapterPartSelect"></select>
+              </label>
+            </div>
             <textarea id="chapterText" placeholder="Текст главы..."></textarea>
+            <label class="field-label">Персонажи в этой главе</label>
+            <div id="chapterCharacterList" class="branch-checkboxes"></div>
             <textarea id="chapterNotes" placeholder="Авторские заметки к главе..." class="notes"></textarea>
           </div>
         </div>

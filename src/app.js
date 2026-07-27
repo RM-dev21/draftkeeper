@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
 
 // ===== ХРАНИЛИЩЕ =====
@@ -75,6 +75,9 @@ function migrateNote(n) {
 // Приводит главу (в том числе из старых/импортированных файлов) к полной структуре.
 function migrateChapter(ch) {
   if (!ch.versions) ch.versions = [];
+  if (ch.number === undefined) ch.number = null;
+  if (ch.partId === undefined) ch.partId = null;
+  if (!ch.characterIds) ch.characterIds = [];
   return ch;
 }
 
@@ -112,6 +115,7 @@ function migrateTimelineEvent(ev) {
 function migrateProject(p) {
   (p.characters || []).forEach(migrateCharacter);
   (p.chapters || []).forEach(migrateChapter);
+  if (!p.parts) p.parts = [];
   if (!p.notes) p.notes = [];
   p.notes.forEach(migrateNote);
   if (!p.branches) p.branches = [];
@@ -135,6 +139,7 @@ function createProjectObj(name) {
     id: uid(),
     name,
     chapters: [],
+    parts: [],
     characters: [],
     branches: [],
     timeline: [],
@@ -464,14 +469,25 @@ document.querySelectorAll('.tab[data-tab]').forEach(btn => {
 // ===== ГЛАВЫ =====
 let activeChapterId = null;
 
+// Пронумерованные главы — по возрастанию номера; главы без номера — в конце,
+// в порядке добавления (сортировка стабильна, порядок исходного массива
+// сохраняется внутри каждой из этих двух групп).
+function sortChaptersList(chapters) {
+  const numbered = chapters.filter(ch => ch.number != null).sort((a, b) => a.number - b.number);
+  const unnumbered = chapters.filter(ch => ch.number == null);
+  return [...numbered, ...unnumbered];
+}
+
 function renderChapters() {
   const p = currentProject();
   const list = document.getElementById('chapterList');
   list.innerHTML = '';
-  p.chapters.forEach(ch => {
+
+  function makeChapterLi(ch, indented) {
     const li = document.createElement('li');
-    li.className = ch.id === activeChapterId ? 'active' : '';
-    li.innerHTML = `<span>${escapeHtml(ch.title || 'Без названия')}</span><span class="del" data-id="${ch.id}">✕</span>`;
+    li.className = [ch.id === activeChapterId ? 'active' : '', 'chapter-item', indented ? 'indented' : ''].filter(Boolean).join(' ');
+    const numberPrefix = ch.number != null ? `${ch.number}. ` : '';
+    li.innerHTML = `<span>${escapeHtml(numberPrefix + (ch.title || 'Без названия'))}</span><span class="del" data-id="${ch.id}">✕</span>`;
     li.addEventListener('click', (e) => {
       if (e.target.classList.contains('del')) return;
       closeVersionsModal();
@@ -493,8 +509,50 @@ function renderChapters() {
       renderChapters();
       renderChapterEditor();
     });
-    list.appendChild(li);
+    return li;
+  }
+
+  const ungrouped = sortChaptersList(p.chapters.filter(ch => !ch.partId));
+  ungrouped.forEach(ch => list.appendChild(makeChapterLi(ch, false)));
+
+  p.parts.forEach((part, idx) => {
+    const header = document.createElement('li');
+    header.className = 'chapter-part-header';
+    header.innerHTML = `
+      <input class="part-name-input" value="${escapeAttr(part.name)}" placeholder="Название части">
+      <span class="chapter-part-actions">
+        <button type="button" class="icon-btn part-move-up" title="Переместить выше" ${idx === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="icon-btn part-move-down" title="Переместить ниже" ${idx === p.parts.length - 1 ? 'disabled' : ''}>▼</button>
+        <button type="button" class="icon-btn part-del" title="Удалить часть">✕</button>
+      </span>
+    `;
+    header.querySelector('.part-name-input').addEventListener('input', e => { part.name = e.target.value; persist(); });
+    header.querySelector('.part-move-up').addEventListener('click', () => {
+      if (idx === 0) return;
+      [p.parts[idx - 1], p.parts[idx]] = [p.parts[idx], p.parts[idx - 1]];
+      persist();
+      renderChapters();
+    });
+    header.querySelector('.part-move-down').addEventListener('click', () => {
+      if (idx === p.parts.length - 1) return;
+      [p.parts[idx + 1], p.parts[idx]] = [p.parts[idx], p.parts[idx + 1]];
+      persist();
+      renderChapters();
+    });
+    header.querySelector('.part-del').addEventListener('click', () => {
+      if (!confirm('Удалить часть? Главы никуда не денутся, но перестанут быть в неё включены.')) return;
+      p.chapters.forEach(ch => { if (ch.partId === part.id) ch.partId = null; });
+      p.parts = p.parts.filter(x => x.id !== part.id);
+      persist();
+      renderChapters();
+      renderChapterEditor();
+    });
+    list.appendChild(header);
+
+    const members = sortChaptersList(p.chapters.filter(ch => ch.partId === part.id));
+    members.forEach(ch => list.appendChild(makeChapterLi(ch, true)));
   });
+
   if (!activeChapterId && p.chapters.length) activeChapterId = p.chapters[0].id;
   // Пустой список нечего показывать на мобильном экране — показываем панель
   // с сообщением "глав пока нет" вместо пустого списка.
@@ -507,32 +565,99 @@ function renderChapterEditor() {
   const titleEl = document.getElementById('chapterTitle');
   const textEl = document.getElementById('chapterText');
   const notesEl = document.getElementById('chapterNotes');
+  const numberEl = document.getElementById('chapterNumber');
+  const partSelectEl = document.getElementById('chapterPartSelect');
+  const charListEl = document.getElementById('chapterCharacterList');
   const emptyEl = document.getElementById('chapterEmptyState');
   const formWrap = document.getElementById('chapterEditorForm');
   if (!ch) {
-    titleEl.value = ''; textEl.value = ''; notesEl.value = '';
-    titleEl.disabled = textEl.disabled = notesEl.disabled = true;
+    titleEl.value = ''; textEl.value = ''; notesEl.value = ''; numberEl.value = '';
+    titleEl.disabled = textEl.disabled = notesEl.disabled = numberEl.disabled = partSelectEl.disabled = true;
+    partSelectEl.innerHTML = '';
+    charListEl.innerHTML = '';
     formWrap.style.display = 'none';
     emptyEl.style.display = 'flex';
     return;
   }
   formWrap.style.display = 'flex';
   emptyEl.style.display = 'none';
-  titleEl.disabled = textEl.disabled = notesEl.disabled = false;
+  titleEl.disabled = textEl.disabled = notesEl.disabled = numberEl.disabled = partSelectEl.disabled = false;
   titleEl.value = ch.title;
   textEl.value = ch.text;
   notesEl.value = ch.notes;
+  numberEl.value = ch.number != null ? ch.number : '';
+
+  partSelectEl.innerHTML = `
+    <option value="">— без части —</option>
+    ${p.parts.map(part => `<option value="${part.id}" ${ch.partId === part.id ? 'selected' : ''}>${escapeHtml(part.name || 'Без названия')}</option>`).join('')}
+  `;
+
+  charListEl.innerHTML = p.characters.map(char => `
+    <label class="branch-check">
+      <input type="checkbox" class="chapter-char-cb" data-char-id="${char.id}" ${ch.characterIds.includes(char.id) ? 'checked' : ''}>
+      ${escapeHtml(char.name || 'Без имени')}
+    </label>
+  `).join('') || '<p class="hint">В проекте пока нет персонажей.</p>';
+
+  charListEl.querySelectorAll('.chapter-char-cb').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const charId = e.target.dataset.charId;
+      if (e.target.checked) {
+        if (!ch.characterIds.includes(charId)) ch.characterIds.push(charId);
+      } else {
+        ch.characterIds = ch.characterIds.filter(id => id !== charId);
+      }
+      persist();
+    });
+  });
 }
 
 document.getElementById('addChapterBtn').addEventListener('click', () => {
   const p = currentProject();
-  const ch = { id: uid(), title: `Глава ${p.chapters.length + 1}`, text: '', notes: '', versions: [] };
+  const ch = { id: uid(), title: `Глава ${p.chapters.length + 1}`, text: '', notes: '', versions: [], number: null, partId: null, characterIds: [] };
   p.chapters.push(ch);
   activeChapterId = ch.id;
   setMobileFullscreenEditing('chapters', true);
   persist();
   renderChapters();
   renderChapterEditor();
+});
+
+document.getElementById('addPartBtn').addEventListener('click', () => {
+  const p = currentProject();
+  p.parts.push({ id: uid(), name: `Часть ${p.parts.length + 1}` });
+  persist();
+  renderChapters();
+});
+
+document.getElementById('chapterNumber').addEventListener('input', () => {
+  const p = currentProject();
+  const ch = p.chapters.find(c => c.id === activeChapterId);
+  if (!ch) return;
+  const raw = document.getElementById('chapterNumber').value;
+  const parsed = parseInt(raw, 10);
+  ch.number = raw === '' || isNaN(parsed) ? null : parsed;
+  persist();
+  renderChapters();
+});
+
+document.getElementById('chapterNumberClearBtn').addEventListener('click', () => {
+  const p = currentProject();
+  const ch = p.chapters.find(c => c.id === activeChapterId);
+  if (!ch) return;
+  ch.number = null;
+  document.getElementById('chapterNumber').value = '';
+  persist();
+  renderChapters();
+});
+
+document.getElementById('chapterPartSelect').addEventListener('change', () => {
+  const p = currentProject();
+  const ch = p.chapters.find(c => c.id === activeChapterId);
+  if (!ch) return;
+  ch.partId = document.getElementById('chapterPartSelect').value || null;
+  persist();
+  renderChapters();
 });
 
 document.getElementById('chapterBackBtn').addEventListener('click', () => {
@@ -986,6 +1111,7 @@ function renderCharacters() {
         other.relationships = other.relationships.filter(r => r.targetCharacterId !== c.id);
       });
       p.notes.forEach(note => { note.links.characterIds = note.links.characterIds.filter(id => id !== c.id); });
+      p.chapters.forEach(ch => { ch.characterIds = ch.characterIds.filter(id => id !== c.id); });
       if (activeCharacterId === c.id) activeCharacterId = p.characters[0]?.id || null;
       setMobileFullscreenEditing('characters', false);
       persist();
@@ -1030,17 +1156,23 @@ function renderCharacterDetail() {
 
   const otherChars = p.characters.filter(x => x.id !== c.id);
 
-  const arcRows = p.chapters.map(ch => `
+  // В арку попадают только главы, к которым персонаж явно прикреплён (во
+  // вкладке «Главы») — не все главы проекта подряд.
+  const characterChapters = sortChaptersList(p.chapters.filter(ch => ch.characterIds.includes(c.id)));
+  const ARC_VISIBLE_COUNT = 5;
+  const arcHasMore = characterChapters.length > ARC_VISIBLE_COUNT;
+  const arcExpanded = arcHasMore && arcListExpandedState.get(c.id) === true;
+  const visibleArcChapters = arcHasMore && !arcExpanded ? characterChapters.slice(-ARC_VISIBLE_COUNT) : characterChapters;
+  const arcFilledCount = characterChapters.filter(ch => c.arcNotes[ch.id]).length;
+
+  const arcRows = visibleArcChapters.map(ch => `
     <div class="arc-row">
-      <span class="arc-chapter-title">${escapeHtml(ch.title || 'Без названия')}</span>
+      <span class="arc-chapter-title">${escapeHtml((ch.number != null ? ch.number + '. ' : '') + (ch.title || 'Без названия'))}</span>
       <textarea class="arc-note" data-chapter-id="${ch.id}" placeholder="Что происходит с персонажем в этой главе...">${escapeHtml(c.arcNotes[ch.id] || '')}</textarea>
     </div>
-  `).join('') || '<p class="hint">В проекте пока нет глав.</p>';
-
-  const ARC_COLLAPSE_THRESHOLD = 5;
-  const arcFilledCount = p.chapters.filter(ch => c.arcNotes[ch.id]).length;
-  const arcDefaultExpanded = p.chapters.length <= ARC_COLLAPSE_THRESHOLD;
-  const arcExpanded = arcListExpandedState.has(c.id) ? arcListExpandedState.get(c.id) : arcDefaultExpanded;
+  `).join('') || (p.chapters.length
+    ? '<p class="hint">Этот персонаж пока не привязан ни к одной главе. Привяжите его в карточке главы во вкладке «Главы».</p>'
+    : '<p class="hint">В проекте пока нет глав.</p>');
 
   const relRows = c.relationships.map(r => `
     <div class="rel-row" data-rel-id="${r.id}">
@@ -1109,10 +1241,10 @@ function renderCharacterDetail() {
 
     <div class="char-section">
       <div class="char-section-header">
-        <h3>Арка — заметки по главам${p.chapters.length ? `<span class="arc-section-summary">(${arcFilledCount} из ${p.chapters.length})</span>` : ''}</h3>
-        ${p.chapters.length ? `<button id="arcToggleBtn" type="button" class="icon-btn" title="${arcExpanded ? 'Свернуть' : 'Развернуть'}">${arcExpanded ? '▼' : '▶'}</button>` : ''}
+        <h3>Арка — заметки по главам${characterChapters.length ? `<span class="arc-section-summary">(${arcFilledCount} из ${characterChapters.length})</span>` : ''}</h3>
+        ${arcHasMore ? `<button id="arcToggleBtn" type="button" class="icon-btn" title="${arcExpanded ? 'Показать только последние 5' : 'Показать все'}">${arcExpanded ? '▼' : '▶'}</button>` : ''}
       </div>
-      <div id="charArcList" style="display:${arcExpanded ? 'block' : 'none'}">${arcRows}</div>
+      <div id="charArcList">${arcRows}</div>
     </div>
 
     <div class="char-section">
