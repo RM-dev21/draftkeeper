@@ -817,6 +817,47 @@ button:disabled {
   min-width: 160px;
 }
 
+.link-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.link-picker-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+}
+
+.link-picker-input {
+  width: 100%;
+}
+
+.link-picker-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.link-picker-suggestion {
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.link-picker-suggestion:hover {
+  background: var(--panel-2);
+}
+
 .note-text { height: 200px; }
 
 .note-images {

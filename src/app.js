@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.6.2';
+const APP_VERSION = '1.7.0';
 document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
 
 // ===== ХРАНИЛИЩЕ =====
@@ -592,23 +592,79 @@ function renderChapterEditor() {
     ${p.parts.map(part => `<option value="${part.id}" ${ch.partId === part.id ? 'selected' : ''}>${escapeHtml(part.name || 'Без названия')}</option>`).join('')}
   `;
 
-  charListEl.innerHTML = p.characters.map(char => `
-    <label class="branch-check">
-      <input type="checkbox" class="chapter-char-cb" data-char-id="${char.id}" ${ch.characterIds.includes(char.id) ? 'checked' : ''}>
-      ${escapeHtml(char.name || 'Без имени')}
-    </label>
-  `).join('') || '<p class="hint">В проекте пока нет персонажей.</p>';
-
-  charListEl.querySelectorAll('.chapter-char-cb').forEach(cb => {
-    cb.addEventListener('change', e => {
-      const charId = e.target.dataset.charId;
-      if (e.target.checked) {
-        if (!ch.characterIds.includes(charId)) ch.characterIds.push(charId);
-      } else {
-        ch.characterIds = ch.characterIds.filter(id => id !== charId);
-      }
+  renderLinkPicker(charListEl, {
+    items: p.characters,
+    selectedIds: ch.characterIds,
+    getLabel: char => char.name || 'Без имени',
+    emptyHint: 'В проекте пока нет персонажей.',
+    placeholder: 'Добавить персонажа...',
+    onAdd: charId => {
+      if (!ch.characterIds.includes(charId)) ch.characterIds.push(charId);
       persist();
+      renderChapterEditor();
+    },
+    onRemove: charId => {
+      ch.characterIds = ch.characterIds.filter(id => id !== charId);
+      persist();
+      renderChapterEditor();
+    },
+  });
+}
+
+// Универсальный виджет "чипы + автодополнение" для привязки одних сущностей
+// проекта к другим (напр. персонажи главы, ветки персонажа) — используется
+// вместо чекбокс-списка на весь список, чтобы не разрастаться при больших
+// проектах.
+function renderLinkPicker(container, { items, selectedIds, getLabel, emptyHint, placeholder, onAdd, onRemove }) {
+  if (!items.length) {
+    container.innerHTML = `<p class="hint">${escapeHtml(emptyHint)}</p>`;
+    return;
+  }
+
+  const selected = selectedIds.map(id => items.find(it => it.id === id)).filter(Boolean);
+  const chipsHtml = selected.map(it => `
+    <span class="note-tag-chip">${escapeHtml(getLabel(it) || 'Без названия')}<button type="button" class="link-picker-remove" data-id="${it.id}">✕</button></span>
+  `).join('');
+
+  container.innerHTML = `
+    <div class="link-picker">
+      ${chipsHtml}
+      <div class="link-picker-input-wrap">
+        <input type="text" class="link-picker-input" placeholder="${escapeAttr(placeholder)}" autocomplete="off">
+        <div class="link-picker-suggestions" hidden></div>
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll('.link-picker-remove').forEach(btn => {
+    btn.addEventListener('click', () => onRemove(btn.dataset.id));
+  });
+
+  const input = container.querySelector('.link-picker-input');
+  const suggBox = container.querySelector('.link-picker-suggestions');
+
+  function closeSuggestions() { suggBox.hidden = true; suggBox.innerHTML = ''; }
+
+  function showSuggestions() {
+    const q = input.value.trim().toLowerCase();
+    const available = items.filter(it => !selectedIds.includes(it.id));
+    const matches = (q ? available.filter(it => (getLabel(it) || '').toLowerCase().includes(q)) : available).slice(0, 20);
+    if (!matches.length) { closeSuggestions(); return; }
+    suggBox.innerHTML = matches.map(it => `<div class="link-picker-suggestion" data-id="${it.id}">${escapeHtml(getLabel(it) || 'Без названия')}</div>`).join('');
+    suggBox.hidden = false;
+    suggBox.querySelectorAll('.link-picker-suggestion').forEach(row => {
+      row.addEventListener('mousedown', e => {
+        e.preventDefault();
+        onAdd(row.dataset.id);
+      });
     });
+  }
+
+  input.addEventListener('focus', showSuggestions);
+  input.addEventListener('input', showSuggestions);
+  input.addEventListener('blur', () => setTimeout(closeSuggestions, 100));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSuggestions();
   });
 }
 
@@ -1188,13 +1244,6 @@ function renderCharacterDetail() {
     </div>
   `).join('') || '<p class="hint">Связей пока нет.</p>';
 
-  const branchRows = p.branches.map(b => `
-    <label class="branch-check">
-      <input type="checkbox" class="branch-cb" data-branch-id="${b.id}" ${c.branchIds.includes(b.id) ? 'checked' : ''}>
-      ${escapeHtml(b.name || 'Без названия')}
-    </label>
-  `).join('') || '<p class="hint">В проекте пока нет сюжетных веток.</p>';
-
   const groupsChipsHtml = c.groups.map(g => `
     <span class="note-tag-chip">${escapeHtml(g)}<button type="button" class="char-group-remove" data-group="${escapeAttr(g)}">✕</button></span>
   `).join('');
@@ -1257,7 +1306,7 @@ function renderCharacterDetail() {
 
     <div class="char-section">
       <h3>Сюжетные ветки</h3>
-      <div id="charBranchList" class="branch-checkboxes">${branchRows}</div>
+      <div id="charBranchList"></div>
     </div>
   `;
 
@@ -1364,16 +1413,22 @@ function renderCharacterDetail() {
     });
   });
 
-  detailEl.querySelectorAll('.branch-cb').forEach(cb => {
-    cb.addEventListener('change', e => {
-      const branchId = e.target.dataset.branchId;
-      if (e.target.checked) {
-        if (!c.branchIds.includes(branchId)) c.branchIds.push(branchId);
-      } else {
-        c.branchIds = c.branchIds.filter(id => id !== branchId);
-      }
+  renderLinkPicker(document.getElementById('charBranchList'), {
+    items: p.branches,
+    selectedIds: c.branchIds,
+    getLabel: b => b.name || 'Без названия',
+    emptyHint: 'В проекте пока нет сюжетных веток.',
+    placeholder: 'Добавить ветку...',
+    onAdd: branchId => {
+      if (!c.branchIds.includes(branchId)) c.branchIds.push(branchId);
       persist();
-    });
+      renderCharacterDetail();
+    },
+    onRemove: branchId => {
+      c.branchIds = c.branchIds.filter(id => id !== branchId);
+      persist();
+      renderCharacterDetail();
+    },
   });
 }
 
@@ -1769,27 +1824,6 @@ function renderNoteDetail() {
     </div>
   `).join('') || '<p class="hint">Изображений пока нет.</p>';
 
-  const charRows = p.characters.map(c => `
-    <label class="branch-check">
-      <input type="checkbox" class="note-link-cb" data-type="characterIds" data-id="${c.id}" ${n.links.characterIds.includes(c.id) ? 'checked' : ''}>
-      ${escapeHtml(c.name || 'Без имени')}
-    </label>
-  `).join('') || '<p class="hint">В проекте пока нет персонажей.</p>';
-
-  const chapterRows = p.chapters.map(ch => `
-    <label class="branch-check">
-      <input type="checkbox" class="note-link-cb" data-type="chapterIds" data-id="${ch.id}" ${n.links.chapterIds.includes(ch.id) ? 'checked' : ''}>
-      ${escapeHtml(ch.title || 'Без названия')}
-    </label>
-  `).join('') || '<p class="hint">В проекте пока нет глав.</p>';
-
-  const branchRows = p.branches.map(b => `
-    <label class="branch-check">
-      <input type="checkbox" class="note-link-cb" data-type="branchIds" data-id="${b.id}" ${n.links.branchIds.includes(b.id) ? 'checked' : ''}>
-      ${escapeHtml(b.name || 'Без названия')}
-    </label>
-  `).join('') || '<p class="hint">В проекте пока нет сюжетных веток.</p>';
-
   const created = n.createdAt ? new Date(n.createdAt).toLocaleString('ru-RU') : '—';
   const updated = n.updatedAt ? new Date(n.updatedAt).toLocaleString('ru-RU') : '—';
 
@@ -1817,17 +1851,17 @@ function renderNoteDetail() {
 
     <div class="char-section">
       <h3>Персонажи</h3>
-      <div class="branch-checkboxes">${charRows}</div>
+      <div id="noteCharList"></div>
     </div>
 
     <div class="char-section">
       <h3>Главы</h3>
-      <div class="branch-checkboxes">${chapterRows}</div>
+      <div id="noteChapterList"></div>
     </div>
 
     <div class="char-section">
       <h3>Сюжетные ветки</h3>
-      <div class="branch-checkboxes">${branchRows}</div>
+      <div id="noteBranchList"></div>
     </div>
   `;
 
@@ -1890,20 +1924,31 @@ function renderNoteDetail() {
     });
   });
 
-  detailEl.querySelectorAll('.note-link-cb').forEach(cb => {
-    cb.addEventListener('change', e => {
-      const type = e.target.dataset.type;
-      const id = e.target.dataset.id;
-      const arr = n.links[type];
-      if (e.target.checked) {
-        if (!arr.includes(id)) arr.push(id);
-      } else {
-        n.links[type] = arr.filter(x => x !== id);
-      }
-      touchNote(n);
-      renderNoteList();
+  function noteLinkPicker(elId, type, items, getLabel, emptyHint, placeholder) {
+    renderLinkPicker(document.getElementById(elId), {
+      items,
+      selectedIds: n.links[type],
+      getLabel,
+      emptyHint,
+      placeholder,
+      onAdd: id => {
+        if (!n.links[type].includes(id)) n.links[type].push(id);
+        touchNote(n);
+        renderNoteList();
+        renderNoteDetail();
+      },
+      onRemove: id => {
+        n.links[type] = n.links[type].filter(x => x !== id);
+        touchNote(n);
+        renderNoteList();
+        renderNoteDetail();
+      },
     });
-  });
+  }
+
+  noteLinkPicker('noteCharList', 'characterIds', p.characters, c => c.name || 'Без имени', 'В проекте пока нет персонажей.', 'Добавить персонажа...');
+  noteLinkPicker('noteChapterList', 'chapterIds', p.chapters, ch => ch.title || 'Без названия', 'В проекте пока нет глав.', 'Добавить главу...');
+  noteLinkPicker('noteBranchList', 'branchIds', p.branches, b => b.name || 'Без названия', 'В проекте пока нет сюжетных веток.', 'Добавить ветку...');
 }
 
 document.getElementById('addNoteBtn').addEventListener('click', () => {
