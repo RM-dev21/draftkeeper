@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
 
 // ===== ХРАНИЛИЩЕ =====
@@ -1576,11 +1576,11 @@ function renderTimeline() {
         <div class="timeline-card-top">
           <input class="year" type="number" step="1" placeholder="Год" value="${ev.year === null ? '' : ev.year}">
           <input class="period" placeholder="Период (напр. «весна»)" value="${escapeAttr(ev.period)}">
+          <select class="ev-branch">
+            <option value="">— без ветки —</option>
+            ${branchOptions}
+          </select>
         </div>
-        <select class="ev-branch">
-          <option value="">— без ветки —</option>
-          ${branchOptions}
-        </select>
         <input class="title" placeholder="Что происходит" value="${escapeAttr(ev.title)}">
       </div>
     `;
