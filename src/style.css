@@ -673,6 +673,13 @@ button:disabled {
 .diff-added { background: rgba(46, 204, 113, 0.25); color: #7be8a0; }
 .diff-removed { background: rgba(231, 76, 60, 0.2); color: #f28b82; text-decoration: line-through; }
 
+.help-modal-box { width: 720px; }
+.help-modal-body h4 { margin: 18px 0 6px; font-size: 14px; }
+.help-modal-body h4:first-child { margin-top: 0; }
+.help-modal-body p { margin: 0 0 10px; line-height: 1.55; font-size: 14px; }
+.help-modal-body ul { margin: 0 0 10px; padding-left: 20px; line-height: 1.55; font-size: 14px; }
+.help-modal-body li { margin-bottom: 4px; }
+
 .modal-actions {
   margin-top: 16px;
   display: flex;
