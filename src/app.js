@@ -13,7 +13,25 @@ function loadAll() {
     return initial;
   }
   const data = JSON.parse(raw);
+  // Если после обновления приложения структура данных меняется (миграция что-то
+  // добавила/переименовала), сохраняем на всякий случай "снимок" данных ровно
+  // перед миграцией — если в новой версии окажется баг, есть куда откатиться
+  // (ключ localStorage: draftkeeper_data_v1_backup_before_migration).
+  const beforeMigration = JSON.stringify(data);
   Object.values(data.projects).forEach(migrateProject);
+  const afterMigration = JSON.stringify(data);
+  if (beforeMigration !== afterMigration) {
+    try {
+      localStorage.setItem(STORAGE_KEY + '_backup_before_migration', beforeMigration);
+    } catch (e) {
+      // localStorage переполнен или недоступен — не критично, просто не будет
+      // резервной копии на этот раз
+    }
+    // Сразу фиксируем мигрированную структуру на диске, а не ждём первого
+    // редактирования — иначе если человек просто откроет и закроет приложение,
+    // на диске так и останется старый формат.
+    saveAll(data);
+  }
   return data;
 }
 
@@ -1364,9 +1382,41 @@ renderAllPanels();
 // ===== PWA: SERVICE WORKER =====
 // Регистрируем офлайн-кэш статики. Ничего не ломается, если это не сработает
 // (например, файл открыт напрямую как file:// без сервера) — просто не будет офлайн-режима.
+function showUpdateBanner() {
+  if (document.getElementById('updateBanner')) return; // уже показан
+  const banner = document.createElement('div');
+  banner.id = 'updateBanner';
+  banner.className = 'update-banner';
+  banner.innerHTML = `
+    <span>Доступна новая версия приложения.</span>
+    <button type="button" id="updateBannerBtn">Обновить</button>
+    <button type="button" id="updateBannerCloseBtn" aria-label="Закрыть">✕</button>
+  `;
+  document.body.appendChild(banner);
+  document.getElementById('updateBannerBtn').addEventListener('click', () => {
+    window.location.reload();
+  });
+  document.getElementById('updateBannerCloseBtn').addEventListener('click', () => {
+    banner.remove();
+  });
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // "updatefound" срабатывает и при самой первой установке, и при
+      // последующих обновлениях — баннер показываем только во втором случае:
+      // если у страницы уже ЕСТЬ активный контроллер, значит это не первый визит.
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner();
+          }
+        });
+      });
+    }).catch(err => {
       console.warn('Не удалось зарегистрировать service worker:', err);
     });
   });
