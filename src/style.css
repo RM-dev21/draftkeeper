@@ -623,10 +623,11 @@ button:disabled {
 }
 
 .timeline-card {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: 10px 40px 10px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -639,7 +640,8 @@ button:disabled {
 }
 
 .timeline-card-top .year {
-  width: 84px;
+  width: 72px;
+  flex-shrink: 0;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -651,7 +653,8 @@ button:disabled {
 .timeline-card-top .year.invalid { border-color: #e05c5c; }
 
 .timeline-card-top .period {
-  width: 170px;
+  flex: 1;
+  min-width: 0;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -660,7 +663,8 @@ button:disabled {
   font-size: 13px;
 }
 
-.timeline-card-top .ev-branch {
+.timeline-card .ev-branch {
+  width: 100%;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -669,7 +673,11 @@ button:disabled {
   font-size: 13px;
 }
 
-.timeline-card-top .del { margin-left: auto; flex-shrink: 0; }
+.timeline-card .del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
 
 .timeline-card .title {
   background: transparent;
@@ -1126,6 +1134,4 @@ button:disabled {
 
   .notes-toolbar { flex-direction: column; }
   .notes-toolbar select { width: 100%; }
-
-  .timeline-card-top { flex-wrap: wrap; }
 }
