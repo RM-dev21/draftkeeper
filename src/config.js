@@ -11,4 +11,4 @@
 // Полученный Client ID (вида xxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com)
 // вставьте вместо пустой строки ниже. Это публичный идентификатор — не пароль
 // и не секретный ключ, его не страшно хранить прямо в клиентском коде.
-const GOOGLE_DRIVE_CLIENT_ID = '';
+const GOOGLE_DRIVE_CLIENT_ID = '1075596504298-o6lpjqn8vc3tbno4hptosh0u2j85q4sc.apps.googleusercontent.com';
