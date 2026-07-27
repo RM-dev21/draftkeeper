@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Draftkeeper</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e2027">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Draftkeeper">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <h1>Draftkeeper</h1>
+
+    <div class="project-block">
+      <label>Проект</label>
+      <select id="projectSelect"></select>
+      <div class="row">
+        <button id="newProjectBtn">+ Новый</button>
+        <button id="renameProjectBtn">✎</button>
+        <button id="deleteProjectBtn">🗑</button>
+      </div>
+    </div>
+
+    <nav>
+      <button class="tab active" data-tab="chapters"><span class="tab-icon">📖</span><span class="tab-label">Главы</span></button>
+      <button class="tab" data-tab="characters"><span class="tab-icon">🧑</span><span class="tab-label">Персонажи</span></button>
+      <button class="tab" data-tab="branches"><span class="tab-icon">🌳</span><span class="tab-label">Ветки</span></button>
+      <button class="tab" data-tab="timeline"><span class="tab-icon">⏳</span><span class="tab-label">Таймлайн</span></button>
+      <button class="tab" data-tab="notes"><span class="tab-icon">🗒️</span><span class="tab-label">Заметки</span></button>
+    </nav>
+
+    <div class="export-block">
+      <button id="exportBtn">⬇ Экспорт проекта (JSON)</button>
+      <button id="importBtn">⬆ Импорт проекта (JSON)</button>
+      <input type="file" id="importFile" accept=".json" hidden>
+    </div>
+
+    <div class="gdrive-block">
+      <button id="gdriveSaveBtn">☁️ Сохранить в Google Drive</button>
+      <button id="gdriveLoadBtn">☁️ Загрузить из Google Drive</button>
+      <div id="gdriveStatus" class="gdrive-status"></div>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <!-- ГЛАВЫ -->
+    <section id="chapters" class="panel active">
+      <div class="panel-header">
+        <h2>Главы</h2>
+        <div class="panel-header-actions">
+          <button id="exportNovelWordBtn">📚 Экспорт всего романа в Word</button>
+          <button id="addChapterBtn">+ Новая глава</button>
+        </div>
+      </div>
+      <div class="split">
+        <ul id="chapterList" class="list"></ul>
+        <div class="editor" style="position:relative">
+          <div id="chapterEmptyState" class="empty-state" style="display:flex">
+            <p>В этом проекте пока нет глав.</p>
+            <p class="hint">Нажмите «+ Новая глава» слева, чтобы начать писать.</p>
+          </div>
+          <div id="chapterEditorForm" style="display:none;height:100%;flex-direction:column;gap:10px">
+            <div class="chapter-title-row">
+              <button id="chapterBackBtn" type="button" class="mobile-back-btn">← Назад</button>
+              <input id="chapterTitle" placeholder="Название главы">
+              <button id="saveVersionBtn" type="button">💾 Сохранить версию</button>
+              <button id="showVersionsBtn" type="button">🕐 История версий</button>
+              <button id="exportChapterWordBtn" type="button">📄 Экспорт в Word</button>
+            </div>
+            <textarea id="chapterText" placeholder="Текст главы..."></textarea>
+            <textarea id="chapterNotes" placeholder="Авторские заметки к главе..." class="notes"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ПЕРСОНАЖИ -->
+    <section id="characters" class="panel">
+      <div class="panel-header">
+        <h2>Персонажи</h2>
+        <button id="addCharacterBtn">+ Новый персонаж</button>
+      </div>
+      <div class="split">
+        <ul id="characterList" class="list"></ul>
+        <div class="editor" style="position:relative">
+          <div id="characterEmptyState" class="empty-state" style="display:flex">
+            <p>В этом проекте пока нет персонажей.</p>
+            <p class="hint">Нажмите «+ Новый персонаж» слева, чтобы начать.</p>
+          </div>
+          <div id="characterDetail" style="display:none"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЮЖЕТНЫЕ ВЕТКИ -->
+    <section id="branches" class="panel">
+      <div class="panel-header">
+        <h2>Сюжетные ветки</h2>
+        <button id="addBranchBtn">+ Новая ветка</button>
+      </div>
+      <div id="branchMap" class="branch-map"></div>
+    </section>
+
+    <!-- ТАЙМЛАЙН -->
+    <section id="timeline" class="panel">
+      <div class="panel-header">
+        <h2>Таймлайн событий</h2>
+        <button id="addEventBtn">+ Новое событие</button>
+      </div>
+      <div id="timelineList" class="timeline"></div>
+    </section>
+
+    <!-- ЗАМЕТКИ -->
+    <section id="notes" class="panel">
+      <div class="panel-header">
+        <h2>Заметки</h2>
+        <button id="addNoteBtn">+ Новая заметка</button>
+      </div>
+      <div class="notes-toolbar">
+        <input id="noteSearch" placeholder="Поиск по названию и тексту...">
+        <select id="noteSort">
+          <option value="created">Сначала новые (по дате создания)</option>
+          <option value="updated">По дате изменения</option>
+          <option value="alpha">По алфавиту</option>
+        </select>
+      </div>
+      <div id="noteTagCloud" class="tag-cloud"></div>
+      <div class="split">
+        <ul id="noteList" class="list note-list"></ul>
+        <div class="editor" style="position:relative">
+          <div id="noteEmptyState" class="empty-state" style="display:flex">
+            <p>Заметок пока нет.</p>
+            <p class="hint">Нажмите «+ Новая заметка» слева, чтобы начать.</p>
+          </div>
+          <div id="noteDetail" style="display:none"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+
+<script src="vendor/diff.min.js"></script>
+<script src="vendor/docx.iife.js"></script>
+<script src="vendor/file-saver.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
