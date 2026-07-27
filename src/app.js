@@ -1210,7 +1210,6 @@ function renderCharacterDetail() {
 
   document.getElementById('addRelBtn').addEventListener('click', () => {
     c.relationships.push({ id: uid(), targetCharacterId: '', relationType: '', description: '' });
-    persist();
     renderCharacterDetail();
   });
 
@@ -1221,6 +1220,12 @@ function renderCharacterDetail() {
     row.querySelector('.rel-type').addEventListener('input', e => { rel.relationType = e.target.value; persist(); });
     row.querySelector('.rel-desc').addEventListener('input', e => { rel.description = e.target.value; persist(); });
     row.querySelector('.rel-del').addEventListener('click', () => {
+      c.relationships = c.relationships.filter(r => r.id !== relId);
+      persist();
+      renderCharacterDetail();
+    });
+    row.addEventListener('focusout', e => {
+      if (row.contains(e.relatedTarget) || rel.targetCharacterId) return;
       c.relationships = c.relationships.filter(r => r.id !== relId);
       persist();
       renderCharacterDetail();
