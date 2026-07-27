@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.9.0';
 document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
 
 // ===== ХРАНИЛИЩЕ =====
@@ -468,6 +468,7 @@ document.querySelectorAll('.tab[data-tab]').forEach(btn => {
 
 // ===== ГЛАВЫ =====
 let activeChapterId = null;
+let chapterSearchQuery = '';
 
 // Пронумерованные главы — по возрастанию номера; главы без номера — в конце,
 // в порядке добавления (сортировка стабильна, порядок исходного массива
@@ -478,10 +479,18 @@ function sortChaptersList(chapters) {
   return [...numbered, ...unnumbered];
 }
 
+function chapterMatchesSearch(ch, q) {
+  if (!q) return true;
+  return (ch.title || '').toLowerCase().includes(q)
+    || (ch.text || '').toLowerCase().includes(q)
+    || (ch.notes || '').toLowerCase().includes(q);
+}
+
 function renderChapters() {
   const p = currentProject();
   const list = document.getElementById('chapterList');
   list.innerHTML = '';
+  const q = chapterSearchQuery.trim().toLowerCase();
 
   function makeChapterLi(ch, indented) {
     const li = document.createElement('li');
@@ -512,10 +521,17 @@ function renderChapters() {
     return li;
   }
 
-  const ungrouped = sortChaptersList(p.chapters.filter(ch => !ch.partId));
+  let matchCount = 0;
+
+  const ungrouped = sortChaptersList(p.chapters.filter(ch => !ch.partId && chapterMatchesSearch(ch, q)));
+  matchCount += ungrouped.length;
   ungrouped.forEach(ch => list.appendChild(makeChapterLi(ch, false)));
 
   p.parts.forEach((part, idx) => {
+    const members = sortChaptersList(p.chapters.filter(ch => ch.partId === part.id && chapterMatchesSearch(ch, q)));
+    if (q && !members.length) return;
+    matchCount += members.length;
+
     const header = document.createElement('li');
     header.className = 'chapter-part-header';
     header.innerHTML = `
@@ -549,9 +565,12 @@ function renderChapters() {
     });
     list.appendChild(header);
 
-    const members = sortChaptersList(p.chapters.filter(ch => ch.partId === part.id));
     members.forEach(ch => list.appendChild(makeChapterLi(ch, true)));
   });
+
+  if (q && !matchCount) {
+    list.innerHTML = '<li class="hint" style="cursor:default">Ничего не найдено по текущему поиску.</li>';
+  }
 
   if (!activeChapterId && p.chapters.length) activeChapterId = p.chapters[0].id;
   // Пустой список нечего показывать на мобильном экране — показываем панель
@@ -1533,6 +1552,7 @@ function renderBranchNode(b, byParent) {
 
   const node = document.createElement('div');
   node.className = 'branch-node';
+  node.dataset.branchId = b.id;
   node.innerHTML = `
     <div class="branch-node-head">
       ${hasChildren ? `<button class="b-toggle" title="${collapsed ? 'Развернуть' : 'Свернуть'}">${collapsed ? '▶' : '▼'}</button>` : '<span class="b-toggle-spacer"></span>'}
@@ -1624,6 +1644,7 @@ function renderTimeline() {
     const color = branchColor(ev.branchId);
     const item = document.createElement('div');
     item.className = 'timeline-row';
+    item.dataset.eventId = ev.id;
     item.innerHTML = `
       <div class="timeline-marker" style="${color ? `background:${color};box-shadow:0 0 0 2px ${color}` : ''}"></div>
       <div class="timeline-card">
@@ -1707,6 +1728,11 @@ function getAllNoteTags(p) {
   return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
 }
 
+function noteMatchesSearch(n, q) {
+  if (!q) return true;
+  return (n.title || '').toLowerCase().includes(q) || (n.text || '').toLowerCase().includes(q);
+}
+
 function getVisibleNotes(p) {
   let list = p.notes.slice();
   if (activeNoteTags.size) {
@@ -1714,7 +1740,7 @@ function getVisibleNotes(p) {
   }
   const q = noteSearchQuery.trim().toLowerCase();
   if (q) {
-    list = list.filter(n => (n.title || '').toLowerCase().includes(q) || (n.text || '').toLowerCase().includes(q));
+    list = list.filter(n => noteMatchesSearch(n, q));
   }
   if (noteSortMode === 'updated') {
     list.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
@@ -1963,6 +1989,11 @@ document.getElementById('addNoteBtn').addEventListener('click', () => {
   renderNoteDetail();
 });
 
+document.getElementById('chapterSearch').addEventListener('input', e => {
+  chapterSearchQuery = e.target.value;
+  renderChapters();
+});
+
 document.getElementById('noteSearch').addEventListener('input', e => {
   noteSearchQuery = e.target.value;
   renderNoteList();
@@ -1971,6 +2002,183 @@ document.getElementById('noteSearch').addEventListener('input', e => {
 document.getElementById('noteSort').addEventListener('change', e => {
   noteSortMode = e.target.value;
   renderNoteList();
+});
+
+// ===== ГЛОБАЛЬНЫЙ ПОИСК =====
+// Ищет по всем вкладкам проекта разом (в отличие от локальных полей поиска
+// на вкладках "Главы" и "Заметки", которые фильтруют только свой список).
+let globalSearchQuery = '';
+
+function characterMatchesSearch(c, q) {
+  if (!q) return true;
+  const fields = [
+    c.name, c.role, c.appearance && c.appearance.description,
+    c.personality, c.biography, c.goals, c.speech,
+    ...(c.groups || []),
+    ...(c.relationships || []).flatMap(r => [r.relationType, r.description]),
+    ...Object.values(c.arcNotes || {})
+  ];
+  return fields.some(f => (f || '').toLowerCase().includes(q));
+}
+
+function branchMatchesSearch(b, q) {
+  if (!q) return true;
+  return (b.name || '').toLowerCase().includes(q) || (b.desc || '').toLowerCase().includes(q);
+}
+
+function timelineEventMatchesSearch(ev, q) {
+  if (!q) return true;
+  return (ev.title || '').toLowerCase().includes(q)
+    || (ev.period || '').toLowerCase().includes(q)
+    || (ev.year != null && String(ev.year).includes(q));
+}
+
+function computeGlobalSearchResults(q) {
+  const p = currentProject();
+  const groups = [];
+
+  const chapterMatches = p.chapters.filter(ch => chapterMatchesSearch(ch, q));
+  if (chapterMatches.length) {
+    groups.push({
+      type: 'chapters',
+      label: 'Главы',
+      items: chapterMatches.map(ch => ({ id: ch.id, title: (ch.number != null ? `${ch.number}. ` : '') + (ch.title || 'Без названия') }))
+    });
+  }
+
+  const characterMatches = p.characters.filter(c => characterMatchesSearch(c, q));
+  if (characterMatches.length) {
+    groups.push({
+      type: 'characters',
+      label: 'Персонажи',
+      items: characterMatches.map(c => ({ id: c.id, title: c.name || 'Без имени' }))
+    });
+  }
+
+  const branchMatches = p.branches.filter(b => branchMatchesSearch(b, q));
+  if (branchMatches.length) {
+    groups.push({
+      type: 'branches',
+      label: 'Ветки',
+      items: branchMatches.map(b => ({ id: b.id, title: b.name || 'Без названия' }))
+    });
+  }
+
+  const timelineMatches = p.timeline.filter(ev => timelineEventMatchesSearch(ev, q));
+  if (timelineMatches.length) {
+    groups.push({
+      type: 'timeline',
+      label: 'Таймлайн',
+      items: timelineMatches.map(ev => ({ id: ev.id, title: ev.title || ev.period || (ev.year != null ? String(ev.year) : 'Без названия') }))
+    });
+  }
+
+  const noteMatches = p.notes.filter(n => noteMatchesSearch(n, q));
+  if (noteMatches.length) {
+    groups.push({
+      type: 'notes',
+      label: 'Заметки',
+      items: noteMatches.map(n => ({ id: n.id, title: n.title || 'Без названия' }))
+    });
+  }
+
+  return groups;
+}
+
+function renderGlobalSearchResults() {
+  const container = document.getElementById('globalSearchResults');
+  const q = globalSearchQuery.trim().toLowerCase();
+  if (!q) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  const groups = computeGlobalSearchResults(q);
+  if (!groups.length) {
+    container.innerHTML = '<div class="global-search-empty">Ничего не найдено.</div>';
+    container.style.display = 'block';
+    return;
+  }
+  container.innerHTML = groups.map(g => `
+    <div class="global-search-group">
+      <div class="global-search-group-label">${escapeHtml(g.label)}</div>
+      ${g.items.map(item => `<div class="global-search-item" data-type="${g.type}" data-id="${item.id}">${escapeHtml(item.title)}</div>`).join('')}
+    </div>
+  `).join('');
+  container.style.display = 'block';
+  container.querySelectorAll('.global-search-item').forEach(el => {
+    // mousedown+preventDefault вместо click — иначе blur поля ввода срабатывает
+    // раньше и закрывает результаты до того, как клик по ним засчитается.
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      goToSearchResult(el.dataset.type, el.dataset.id);
+    });
+  });
+}
+
+function scrollToAndHighlight(selector) {
+  requestAnimationFrame(() => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('search-highlight');
+    setTimeout(() => el.classList.remove('search-highlight'), 1600);
+  });
+}
+
+function goToSearchResult(type, id) {
+  const input = document.getElementById('globalSearch');
+  input.value = '';
+  globalSearchQuery = '';
+  document.getElementById('globalSearchResults').style.display = 'none';
+
+  if (type === 'chapters') activeChapterId = id;
+  if (type === 'characters') activeCharacterId = id;
+  if (type === 'notes') activeNoteId = id;
+
+  const tabBtn = document.querySelector(`.tab[data-tab="${type}"]`);
+  if (tabBtn) tabBtn.click();
+
+  if (type === 'chapters') {
+    setMobileFullscreenEditing('chapters', true);
+    renderChapters();
+    renderChapterEditor();
+  } else if (type === 'characters') {
+    setMobileFullscreenEditing('characters', true);
+    renderCharacters();
+    renderCharacterDetail();
+  } else if (type === 'notes') {
+    setMobileFullscreenEditing('notes', true);
+    renderNoteList();
+    renderNoteDetail();
+  } else if (type === 'branches') {
+    scrollToAndHighlight(`.branch-node[data-branch-id="${id}"]`);
+  } else if (type === 'timeline') {
+    scrollToAndHighlight(`.timeline-row[data-event-id="${id}"]`);
+  }
+  input.blur();
+}
+
+document.getElementById('globalSearch').addEventListener('input', e => {
+  globalSearchQuery = e.target.value;
+  renderGlobalSearchResults();
+});
+
+document.getElementById('globalSearch').addEventListener('focus', e => {
+  if (e.target.value.trim()) renderGlobalSearchResults();
+});
+
+document.getElementById('globalSearch').addEventListener('blur', () => {
+  setTimeout(() => { document.getElementById('globalSearchResults').style.display = 'none'; }, 150);
+});
+
+document.getElementById('globalSearch').addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    e.target.value = '';
+    globalSearchQuery = '';
+    renderGlobalSearchResults();
+    e.target.blur();
+  }
 });
 
 // ===== УТИЛИТЫ =====
@@ -1984,6 +2192,11 @@ function escapeAttr(str) {
 // ===== ИНИЦИАЛИЗАЦИЯ =====
 function renderAllPanels() {
   activeChapterId = null;
+  chapterSearchQuery = '';
+  document.getElementById('chapterSearch').value = '';
+  globalSearchQuery = '';
+  document.getElementById('globalSearch').value = '';
+  document.getElementById('globalSearchResults').style.display = 'none';
   activeCharacterId = null;
   activeCharacterGroups = new Set();
   activeNoteId = null;

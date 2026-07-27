@@ -30,6 +30,11 @@
       </div>
     </div>
 
+    <div class="global-search-block">
+      <input id="globalSearch" placeholder="Поиск по всему проекту...">
+      <div id="globalSearchResults" class="global-search-results" style="display:none"></div>
+    </div>
+
     <nav>
       <button class="tab active" data-tab="chapters"><span class="tab-icon">📖</span><span class="tab-label">Главы</span></button>
       <button class="tab" data-tab="characters"><span class="tab-icon">🧑</span><span class="tab-label">Персонажи</span></button>
@@ -63,6 +68,9 @@
           <button id="addPartBtn" type="button">+ Часть</button>
           <button id="addChapterBtn">+ Новая глава</button>
         </div>
+      </div>
+      <div class="notes-toolbar">
+        <input id="chapterSearch" placeholder="Поиск по названию, тексту и заметкам...">
       </div>
       <div class="split">
         <ul id="chapterList" class="list"></ul>
