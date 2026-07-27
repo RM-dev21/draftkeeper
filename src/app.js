@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
 
 // ===== ХРАНИЛИЩЕ =====
@@ -78,11 +78,46 @@ function migrateChapter(ch) {
   return ch;
 }
 
+// Приводит сюжетную ветку к полной структуре.
+function migrateBranch(b) {
+  if (b.name === undefined) b.name = '';
+  if (b.desc === undefined) b.desc = '';
+  if (b.parentId === undefined) b.parentId = null;
+  return b;
+}
+
+// Приводит событие таймлайна к полной структуре. Старое поле date было
+// свободным текстом ("весна 1823", "1823" и т.п.) — не терять его: если это
+// просто число, оно становится годом (для сортировки); иначе весь текст
+// сохраняется в period, а год извлекается по первому найденному числу.
+function migrateTimelineEvent(ev) {
+  if (ev.year === undefined) {
+    const raw = (ev.date || '').trim();
+    if (/^-?\d+$/.test(raw)) {
+      ev.year = parseInt(raw, 10);
+      ev.period = '';
+    } else {
+      const match = raw.match(/-?\d+/);
+      ev.year = match ? parseInt(match[0], 10) : null;
+      ev.period = raw;
+    }
+  }
+  if (ev.period === undefined) ev.period = '';
+  if (ev.title === undefined) ev.title = '';
+  delete ev.date;
+  if (ev.branchId === undefined) ev.branchId = null;
+  return ev;
+}
+
 function migrateProject(p) {
   (p.characters || []).forEach(migrateCharacter);
   (p.chapters || []).forEach(migrateChapter);
   if (!p.notes) p.notes = [];
   p.notes.forEach(migrateNote);
+  if (!p.branches) p.branches = [];
+  p.branches.forEach(migrateBranch);
+  if (!p.timeline) p.timeline = [];
+  p.timeline.forEach(migrateTimelineEvent);
   if (p.driveBackup === undefined) p.driveBackup = null;
   return p;
 }
@@ -412,6 +447,16 @@ document.querySelectorAll('.tab[data-tab]').forEach(btn => {
       renderNoteTagCloud();
       renderNoteList();
       renderNoteDetail();
+    }
+    // Карточка ветки показывает привязанных персонажей — освежаем, если их
+    // привязку меняли на вкладке "Персонажи".
+    if (btn.dataset.tab === 'branches') {
+      renderBranches();
+    }
+    // Список событий ссылается на ветки (цвет маркера, выпадающий список) —
+    // освежаем, если ветки успели измениться на своей вкладке.
+    if (btn.dataset.tab === 'timeline') {
+      renderTimeline();
     }
   });
 });
@@ -1182,41 +1227,128 @@ document.getElementById('addCharacterBtn').addEventListener('click', () => {
 });
 
 // ===== СЮЖЕТНЫЕ ВЕТКИ =====
+// UI-состояние (не персистится): какие ветки свёрнуты в дереве.
+let collapsedBranchIds = new Set();
+
+// Возвращает id всех потомков ветки — используется, чтобы нельзя было выбрать
+// потомка как родителя (иначе в дереве образуется цикл).
+function getBranchDescendantIds(branchId, all) {
+  const result = new Set();
+  const stack = [branchId];
+  while (stack.length) {
+    const cur = stack.pop();
+    all.forEach(x => {
+      if (x.parentId === cur && !result.has(x.id)) {
+        result.add(x.id);
+        stack.push(x.id);
+      }
+    });
+  }
+  return result;
+}
+
+// Подстраховка для дерева от циклов parentId, которые могли возникнуть в
+// старых/сторонних импортированных данных (UI сам их создать не даёт).
+function getEffectiveParentId(b, byId) {
+  let cur = byId.get(b.parentId);
+  const seen = new Set();
+  while (cur) {
+    if (cur.id === b.id || seen.has(cur.id)) return null;
+    seen.add(cur.id);
+    cur = byId.get(cur.parentId);
+  }
+  return b.parentId && byId.has(b.parentId) ? b.parentId : null;
+}
+
 function renderBranches() {
   const p = currentProject();
   const map = document.getElementById('branchMap');
   map.innerHTML = '';
+
+  if (!p.branches.length) {
+    map.innerHTML = '<p class="hint">Веток пока нет.</p>';
+    return;
+  }
+
+  const byId = new Map(p.branches.map(b => [b.id, b]));
+  const byParent = new Map();
   p.branches.forEach(b => {
-    const node = document.createElement('div');
-    node.className = 'branch-node';
-    const options = p.branches
-      .filter(x => x.id !== b.id)
-      .map(x => `<option value="${x.id}" ${b.parentId === x.id ? 'selected' : ''}>${escapeHtml(x.name || 'Без названия')}</option>`)
-      .join('');
-    node.innerHTML = `
+    const parentId = getEffectiveParentId(b, byId);
+    if (!byParent.has(parentId)) byParent.set(parentId, []);
+    byParent.get(parentId).push(b);
+  });
+
+  (byParent.get(null) || []).forEach(b => map.appendChild(renderBranchNode(b, byParent)));
+}
+
+function renderBranchNode(b, byParent) {
+  const p = currentProject();
+  const wrap = document.createElement('div');
+  wrap.className = 'branch-branch';
+
+  const children = byParent.get(b.id) || [];
+  const hasChildren = children.length > 0;
+  const collapsed = collapsedBranchIds.has(b.id);
+
+  const excluded = new Set([b.id, ...getBranchDescendantIds(b.id, p.branches)]);
+  const options = p.branches
+    .filter(x => !excluded.has(x.id))
+    .map(x => `<option value="${x.id}" ${b.parentId === x.id ? 'selected' : ''}>${escapeHtml(x.name || 'Без названия')}</option>`)
+    .join('');
+
+  const linkedChars = p.characters.filter(c => c.branchIds.includes(b.id));
+  const charChips = linkedChars.length
+    ? linkedChars.map(c => `<span class="branch-char-chip">${escapeHtml(c.name || 'Без имени')}</span>`).join('')
+    : '<span class="hint">Персонажи не привязаны</span>';
+
+  const node = document.createElement('div');
+  node.className = 'branch-node';
+  node.innerHTML = `
+    <div class="branch-node-head">
+      ${hasChildren ? `<button class="b-toggle" title="${collapsed ? 'Развернуть' : 'Свернуть'}">${collapsed ? '▶' : '▼'}</button>` : '<span class="b-toggle-spacer"></span>'}
       <input class="b-name" placeholder="Название ветки" value="${escapeAttr(b.name)}">
-      <textarea class="b-desc" placeholder="Что происходит в этой ветке">${escapeHtml(b.desc)}</textarea>
-      <select class="b-parent">
-        <option value="">— нет родительской ветки —</option>
-        ${options}
-      </select>
-      <button class="b-del">Удалить ветку</button>
-    `;
-    node.querySelector('.b-name').addEventListener('input', e => { b.name = e.target.value; persist(); });
-    node.querySelector('.b-name').addEventListener('blur', () => { renderBranches(); });
-    node.querySelector('.b-desc').addEventListener('input', e => { b.desc = e.target.value; persist(); });
-    node.querySelector('.b-parent').addEventListener('change', e => { b.parentId = e.target.value || null; persist(); });
-    node.querySelector('.b-del').addEventListener('click', () => {
-      if (!confirm('Удалить ветку?')) return;
-      p.branches = p.branches.filter(x => x.id !== b.id);
-      p.branches.forEach(x => { if (x.parentId === b.id) x.parentId = null; });
-      p.characters.forEach(char => { char.branchIds = char.branchIds.filter(id => id !== b.id); });
-      p.notes.forEach(note => { note.links.branchIds = note.links.branchIds.filter(id => id !== b.id); });
-      persist();
+      <button class="b-del" title="Удалить ветку">✕</button>
+    </div>
+    <textarea class="b-desc" placeholder="Что происходит в этой ветке">${escapeHtml(b.desc)}</textarea>
+    <select class="b-parent">
+      <option value="">— нет родительской ветки —</option>
+      ${options}
+    </select>
+    <div class="branch-chars">${charChips}</div>
+  `;
+  node.querySelector('.b-name').addEventListener('input', e => { b.name = e.target.value; persist(); });
+  node.querySelector('.b-name').addEventListener('blur', () => { renderBranches(); });
+  node.querySelector('.b-desc').addEventListener('input', e => { b.desc = e.target.value; persist(); });
+  node.querySelector('.b-parent').addEventListener('change', e => { b.parentId = e.target.value || null; persist(); renderBranches(); });
+  node.querySelector('.b-del').addEventListener('click', () => {
+    if (!confirm('Удалить ветку?')) return;
+    p.branches = p.branches.filter(x => x.id !== b.id);
+    p.branches.forEach(x => { if (x.parentId === b.id) x.parentId = null; });
+    p.characters.forEach(char => { char.branchIds = char.branchIds.filter(id => id !== b.id); });
+    p.notes.forEach(note => { note.links.branchIds = note.links.branchIds.filter(id => id !== b.id); });
+    p.timeline.forEach(ev => { if (ev.branchId === b.id) ev.branchId = null; });
+    collapsedBranchIds.delete(b.id);
+    persist();
+    renderBranches();
+    renderTimeline();
+  });
+  if (hasChildren) {
+    node.querySelector('.b-toggle').addEventListener('click', () => {
+      if (collapsed) collapsedBranchIds.delete(b.id); else collapsedBranchIds.add(b.id);
       renderBranches();
     });
-    map.appendChild(node);
-  });
+  }
+
+  wrap.appendChild(node);
+
+  if (hasChildren && !collapsed) {
+    const childrenWrap = document.createElement('div');
+    childrenWrap.className = 'branch-children';
+    children.forEach(child => childrenWrap.appendChild(renderBranchNode(child, byParent)));
+    wrap.appendChild(childrenWrap);
+  }
+
+  return wrap;
 }
 
 document.getElementById('addBranchBtn').addEventListener('click', () => {
@@ -1227,21 +1359,77 @@ document.getElementById('addBranchBtn').addEventListener('click', () => {
 });
 
 // ===== ТАЙМЛАЙН =====
+// Палитра для раскраски событий по ветке (по индексу ветки в проекте, циклично).
+const BRANCH_COLORS = ['#8b7cf6', '#f6a97c', '#7cf6d8', '#f67c9e', '#c8f67c', '#7cb8f6', '#f6e07c', '#d67cf6'];
+
+function branchColor(branchId) {
+  if (!branchId) return null;
+  const p = currentProject();
+  const idx = p.branches.findIndex(b => b.id === branchId);
+  return idx === -1 ? null : BRANCH_COLORS[idx % BRANCH_COLORS.length];
+}
+
 function renderTimeline() {
   const p = currentProject();
   const list = document.getElementById('timelineList');
   list.innerHTML = '';
-  const sorted = [...p.timeline].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  if (!p.timeline.length) {
+    list.innerHTML = '<p class="hint">Событий пока нет.</p>';
+    return;
+  }
+
+  const sorted = [...p.timeline].sort((a, b) => {
+    if (a.year === null && b.year === null) return (a.period || '').localeCompare(b.period || '');
+    if (a.year === null) return 1;
+    if (b.year === null) return -1;
+    return a.year - b.year || (a.period || '').localeCompare(b.period || '');
+  });
+
+  const branchOptions = p.branches
+    .map(b => `<option value="${b.id}">${escapeHtml(b.name || 'Без названия')}</option>`)
+    .join('');
+
   sorted.forEach(ev => {
+    const color = branchColor(ev.branchId);
     const item = document.createElement('div');
-    item.className = 'timeline-item';
+    item.className = 'timeline-row';
     item.innerHTML = `
-      <input class="date" placeholder="Дата/период" value="${escapeAttr(ev.date)}">
-      <input class="title" placeholder="Что происходит" value="${escapeAttr(ev.title)}">
-      <button class="del">✕</button>
+      <div class="timeline-marker" style="${color ? `background:${color};box-shadow:0 0 0 2px ${color}` : ''}"></div>
+      <div class="timeline-card">
+        <div class="timeline-card-top">
+          <input class="year" type="number" step="1" placeholder="Год" value="${ev.year === null ? '' : ev.year}">
+          <input class="period" placeholder="Период (напр. «весна»)" value="${escapeAttr(ev.period)}">
+          <select class="ev-branch">
+            <option value="">— без ветки —</option>
+            ${branchOptions}
+          </select>
+          <button class="del" title="Удалить событие">✕</button>
+        </div>
+        <input class="title" placeholder="Что происходит" value="${escapeAttr(ev.title)}">
+      </div>
     `;
-    item.querySelector('.date').addEventListener('input', e => { ev.date = e.target.value; persist(); });
+    const yearInput = item.querySelector('.year');
+    yearInput.addEventListener('input', e => {
+      const v = e.target.value.trim();
+      if (v === '') {
+        ev.year = null;
+        yearInput.classList.remove('invalid');
+        persist();
+      } else if (/^-?\d+$/.test(v)) {
+        ev.year = parseInt(v, 10);
+        yearInput.classList.remove('invalid');
+        persist();
+      } else {
+        yearInput.classList.add('invalid');
+      }
+    });
+    yearInput.addEventListener('blur', () => renderTimeline());
+    item.querySelector('.period').addEventListener('input', e => { ev.period = e.target.value; persist(); });
     item.querySelector('.title').addEventListener('input', e => { ev.title = e.target.value; persist(); });
+    const branchSelect = item.querySelector('.ev-branch');
+    branchSelect.value = ev.branchId || '';
+    branchSelect.addEventListener('change', e => { ev.branchId = e.target.value || null; persist(); renderTimeline(); });
     item.querySelector('.del').addEventListener('click', () => {
       p.timeline = p.timeline.filter(x => x.id !== ev.id);
       persist();
@@ -1253,7 +1441,7 @@ function renderTimeline() {
 
 document.getElementById('addEventBtn').addEventListener('click', () => {
   const p = currentProject();
-  p.timeline.push({ id: uid(), date: '', title: '' });
+  p.timeline.push({ id: uid(), year: null, period: '', title: '', branchId: null });
   persist();
   renderTimeline();
 });
