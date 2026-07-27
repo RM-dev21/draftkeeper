@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
 
 // ===== ХРАНИЛИЩЕ =====
@@ -719,6 +719,17 @@ function openHelpModal() {
           → «На экран Домой» (iPhone/Safari). На компьютере в Chrome/Edge в
           адресной строке появится значок установки.</p>
 
+          <h4>Если приложение не обновляется</h4>
+          <p>Номер версии показан в сайдбаре слева от названия приложения.
+          Обычно новая версия подтягивается сама (появляется баннер
+          «Доступна новая версия» — нажмите «Обновить»). Если баннер не
+          появляется подолгу, хотя вы знаете, что вышло обновление, или
+          приложение выглядит «сломанным» после обновления страницы —
+          нажмите кнопку ниже. Она сбросит офлайн-кэш и загрузит всё заново
+          с сервера. Ваши проекты, персонажи и главы (они хранятся отдельно,
+          в localStorage) при этом не затрагиваются.</p>
+          <button type="button" id="forceUpdateBtn">Обновить принудительно</button>
+
         </div>
       </div>
     </div>
@@ -728,6 +739,7 @@ function openHelpModal() {
   document.getElementById('modalOverlay').addEventListener('click', e => {
     if (e.target.id === 'modalOverlay') closeHelpModal();
   });
+  document.getElementById('forceUpdateBtn').addEventListener('click', forceUpdate);
 }
 
 document.getElementById('helpBtn').addEventListener('click', openHelpModal);
@@ -1591,27 +1603,73 @@ renderAllPanels();
 // ===== PWA: SERVICE WORKER =====
 // Регистрируем офлайн-кэш статики. Ничего не ломается, если это не сработает
 // (например, файл открыт напрямую как file:// без сервера) — просто не будет офлайн-режима.
-function showUpdateBanner(newWorker) {
+function showUpdateBanner(text, buttonText, onButtonClick) {
   if (document.getElementById('updateBanner')) return; // уже показан
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
   banner.className = 'update-banner';
   banner.innerHTML = `
-    <span>Доступна новая версия приложения.</span>
-    <button type="button" id="updateBannerBtn">Обновить</button>
+    <span>${text}</span>
+    <button type="button" id="updateBannerBtn">${buttonText}</button>
     <button type="button" id="updateBannerCloseBtn" aria-label="Закрыть">✕</button>
   `;
   document.body.appendChild(banner);
-  document.getElementById('updateBannerBtn').addEventListener('click', () => {
-    // Перезагрузка произойдёт не здесь, а в обработчике controllerchange —
-    // только когда новый воркер реально станет активным контроллером
-    // страницы. Иначе возможна гонка: reload() случается раньше, чем новый
-    // воркер вступит в силу, и страница перезагрузится под старым кэшем.
-    newWorker.postMessage('skipWaiting');
-  });
+  document.getElementById('updateBannerBtn').addEventListener('click', onButtonClick);
   document.getElementById('updateBannerCloseBtn').addEventListener('click', () => {
     banner.remove();
   });
+}
+
+// Снимает регистрацию всех service worker'ов и чистит все их кэши, затем
+// перезагружает страницу — гарантированно приводит к свежей версии
+// независимо от того, в каком состоянии застрял воркер. Данные проекта
+// (localStorage) это не затрагивает. Используется и вручную из раздела
+// "Помощь", и автоматически при обнаружении устаревшей версии ниже.
+async function forceUpdate() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const names = await caches.keys();
+      await Promise.all(names.map(n => caches.delete(n)));
+    }
+  } catch (err) {
+    console.warn('Не удалось полностью сбросить кэш перед принудительным обновлением:', err);
+  } finally {
+    window.location.reload();
+  }
+}
+
+// Обычный механизм обновления (через updatefound/controllerchange ниже) не
+// сработает, если сам service worker застрял в старом состоянии и даже не
+// заметил новый sw.js на сервере — именно так уже бывало на практике.
+// Поэтому отдельно и независимо от service worker сверяем номер версии в
+// уже выполняющемся app.js с версией в актуальном файле на сервере (запрос
+// с cache-busting параметром и cache: 'no-store', чтобы не попасть под кэш
+// самого service worker'а). Если они разошлись — значит обычное обновление
+// не сработало, и предлагаем принудительный сброс.
+let lastStaleVersionCheck = 0;
+async function checkForStaleVersion() {
+  const now = Date.now();
+  if (now - lastStaleVersionCheck < 15 * 60 * 1000) return; // не чаще раза в 15 минут
+  lastStaleVersionCheck = now;
+  try {
+    const res = await fetch(`app.js?_v=${now}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const text = await res.text();
+    const match = text.match(/const APP_VERSION = '([^']+)'/);
+    if (match && match[1] !== APP_VERSION) {
+      showUpdateBanner(
+        'Показывается устаревшая версия приложения — обычное обновление не сработало.',
+        'Обновить принудительно',
+        forceUpdate
+      );
+    }
+  } catch (err) {
+    // Офлайн или сеть недоступна — молча пропускаем, это не ошибка.
+  }
 }
 
 if ('serviceWorker' in navigator) {
@@ -1632,7 +1690,13 @@ if ('serviceWorker' in navigator) {
         if (!newWorker) return;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdateBanner(newWorker);
+            showUpdateBanner('Доступна новая версия приложения.', 'Обновить', () => {
+              // Перезагрузка произойдёт не здесь, а в обработчике controllerchange —
+              // только когда новый воркер реально станет активным контроллером
+              // страницы. Иначе возможна гонка: reload() случается раньше, чем новый
+              // воркер вступит в силу, и страница перезагрузится под старым кэшем.
+              newWorker.postMessage('skipWaiting');
+            });
           }
         });
       });
@@ -1641,3 +1705,8 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+
+window.addEventListener('load', () => setTimeout(checkForStaleVersion, 3000));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForStaleVersion();
+});
