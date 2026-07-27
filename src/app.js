@@ -1591,7 +1591,7 @@ renderAllPanels();
 // ===== PWA: SERVICE WORKER =====
 // Регистрируем офлайн-кэш статики. Ничего не ломается, если это не сработает
 // (например, файл открыт напрямую как file:// без сервера) — просто не будет офлайн-режима.
-function showUpdateBanner() {
+function showUpdateBanner(newWorker) {
   if (document.getElementById('updateBanner')) return; // уже показан
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
@@ -1603,7 +1603,11 @@ function showUpdateBanner() {
   `;
   document.body.appendChild(banner);
   document.getElementById('updateBannerBtn').addEventListener('click', () => {
-    window.location.reload();
+    // Перезагрузка произойдёт не здесь, а в обработчике controllerchange —
+    // только когда новый воркер реально станет активным контроллером
+    // страницы. Иначе возможна гонка: reload() случается раньше, чем новый
+    // воркер вступит в силу, и страница перезагрузится под старым кэшем.
+    newWorker.postMessage('skipWaiting');
   });
   document.getElementById('updateBannerCloseBtn').addEventListener('click', () => {
     banner.remove();
@@ -1611,6 +1615,13 @@ function showUpdateBanner() {
 }
 
 if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then(reg => {
       // "updatefound" срабатывает и при самой первой установке, и при
@@ -1621,7 +1632,7 @@ if ('serviceWorker' in navigator) {
         if (!newWorker) return;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdateBanner();
+            showUpdateBanner(newWorker);
           }
         });
       });

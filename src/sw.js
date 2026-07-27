@@ -5,7 +5,7 @@
 // Важно: при любом изменении файлов приложения (app.js/style.css/index.html/...)
 // увеличивайте CACHE_VERSION ниже — иначе у уже установивших приложение
 // пользователей продолжит отдаваться старая закэшированная версия.
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `draftkeeper-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -27,8 +27,19 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
   );
+});
+
+// Новый воркер остаётся в состоянии "waiting", пока пользователь не нажмёт
+// "Обновить" в баннере (app.js шлёт это сообщение) — если активировать его
+// сразу (skipWaiting в install), он может перехватить контроль над страницей
+// раньше, чем сработает location.reload() после клика, и тогда перезагрузка
+// попадёт под старый воркер/кэш, а пользователю покажется, что обновление
+// "не подтянулось".
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', event => {
