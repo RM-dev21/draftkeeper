@@ -47,6 +47,7 @@ function migrateCharacter(c) {
   if (!c.arcNotes) c.arcNotes = {};
   if (!c.relationships) c.relationships = [];
   if (!c.branchIds) c.branchIds = [];
+  if (!c.groups) c.groups = [];
   return c;
 }
 
@@ -394,6 +395,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     // Карточка персонажа зависит от актуального списка глав и веток —
     // перерисовываем при каждом открытии вкладки, а не только по своим событиям.
     if (btn.dataset.tab === 'characters') {
+      renderCharacterGroupCloud();
       renderCharacters();
       renderCharacterDetail();
     }
@@ -737,15 +739,55 @@ document.getElementById('exportNovelWordBtn').addEventListener('click', async ()
 
 // ===== ПЕРСОНАЖИ =====
 let activeCharacterId = null;
+let activeCharacterGroups = new Set();
+
+// Все группы, встречающиеся у персонажей проекта (для облака фильтров), по алфавиту.
+function getAllCharacterGroups(p) {
+  const set = new Set();
+  p.characters.forEach(c => c.groups.forEach(g => set.add(g)));
+  return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
+}
+
+function getVisibleCharacters(p) {
+  if (!activeCharacterGroups.size) return p.characters;
+  return p.characters.filter(c => c.groups.some(g => activeCharacterGroups.has(g)));
+}
+
+function renderCharacterGroupCloud() {
+  const p = currentProject();
+  const cloud = document.getElementById('characterGroupCloud');
+  const groups = getAllCharacterGroups(p);
+  if (!groups.length) {
+    cloud.innerHTML = '<span class="tag-chip-empty">Групп пока нет — добавьте их в карточке персонажа.</span>';
+    return;
+  }
+  cloud.innerHTML = groups.map(g => `<span class="tag-chip ${activeCharacterGroups.has(g) ? 'active' : ''}" data-group="${escapeAttr(g)}">${escapeHtml(g)}</span>`).join('');
+  cloud.querySelectorAll('.tag-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const group = chip.dataset.group;
+      if (activeCharacterGroups.has(group)) activeCharacterGroups.delete(group); else activeCharacterGroups.add(group);
+      renderCharacterGroupCloud();
+      renderCharacters();
+    });
+  });
+}
 
 function renderCharacters() {
   const p = currentProject();
   const list = document.getElementById('characterList');
   list.innerHTML = '';
-  p.characters.forEach(c => {
+  const characters = getVisibleCharacters(p);
+  characters.forEach(c => {
     const li = document.createElement('li');
     li.className = c.id === activeCharacterId ? 'active' : '';
-    li.innerHTML = `<span>${escapeHtml(c.name || 'Без имени')}</span><span class="del" data-id="${c.id}">✕</span>`;
+    const groupsHtml = c.groups.map(g => `<span class="note-item-tag">${escapeHtml(g)}</span>`).join('');
+    li.innerHTML = `
+      <div class="note-item-header">
+        <span>${escapeHtml(c.name || 'Без имени')}</span>
+        <span class="del" data-id="${c.id}">✕</span>
+      </div>
+      ${groupsHtml ? `<div class="note-item-tags">${groupsHtml}</div>` : ''}
+    `;
     li.addEventListener('click', e => {
       if (e.target.classList.contains('del')) return;
       activeCharacterId = c.id;
@@ -764,13 +806,18 @@ function renderCharacters() {
       if (activeCharacterId === c.id) activeCharacterId = p.characters[0]?.id || null;
       setMobileFullscreenEditing('characters', false);
       persist();
+      renderCharacterGroupCloud();
       renderCharacters();
       renderCharacterDetail();
     });
     list.appendChild(li);
   });
-  if (!activeCharacterId && p.characters.length) activeCharacterId = p.characters[0].id;
-  if (!p.characters.length) setSplitMobileDetail('characters', true);
+  if (!activeCharacterId && characters.length) activeCharacterId = characters[0].id;
+  if (!p.characters.length) {
+    setSplitMobileDetail('characters', true);
+  } else if (!characters.length) {
+    list.innerHTML = '<li class="hint" style="cursor:default">Ничего не найдено по текущему фильтру групп.</li>';
+  }
 }
 
 function renderCharacterDetail() {
@@ -817,6 +864,10 @@ function renderCharacterDetail() {
     </label>
   `).join('') || '<p class="hint">В проекте пока нет сюжетных веток.</p>';
 
+  const groupsChipsHtml = c.groups.map(g => `
+    <span class="note-tag-chip">${escapeHtml(g)}<button type="button" class="char-group-remove" data-group="${escapeAttr(g)}">✕</button></span>
+  `).join('');
+
   detailEl.innerHTML = `
     <button type="button" id="characterBackBtn" class="mobile-back-btn">← Назад к списку</button>
     <div class="char-photo-row">
@@ -830,6 +881,12 @@ function renderCharacterDetail() {
 
     <input id="charName" placeholder="Имя" value="${escapeAttr(c.name)}">
     <input id="charRole" placeholder="Роль (протагонист, антагонист...)" value="${escapeAttr(c.role)}">
+
+    <label class="field-label">Группы (клан, гильдия, фракция...)</label>
+    <div class="note-tags-editor" id="charGroupsChips">
+      ${groupsChipsHtml}
+      <input id="charGroupInput" placeholder="Добавить группу и нажать Enter">
+    </div>
 
     <label class="field-label">Внешность (описание)</label>
     <textarea id="charAppearanceDesc" class="char-textarea" placeholder="Как выглядит персонаж...">${escapeHtml(c.appearance.description)}</textarea>
@@ -868,6 +925,29 @@ function renderCharacterDetail() {
   document.getElementById('characterBackBtn').addEventListener('click', () => setMobileFullscreenEditing('characters', false));
   document.getElementById('charName').addEventListener('input', e => { c.name = e.target.value; persist(); renderCharacters(); });
   document.getElementById('charRole').addEventListener('input', e => { c.role = e.target.value; persist(); });
+
+  document.getElementById('charGroupInput').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (!val || c.groups.includes(val)) { e.target.value = ''; return; }
+    c.groups.push(val);
+    persist();
+    renderCharacterGroupCloud();
+    renderCharacters();
+    renderCharacterDetail();
+    document.getElementById('charGroupInput').focus();
+  });
+  detailEl.querySelectorAll('.char-group-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      c.groups = c.groups.filter(g => g !== btn.dataset.group);
+      persist();
+      renderCharacterGroupCloud();
+      renderCharacters();
+      renderCharacterDetail();
+    });
+  });
+
   document.getElementById('charAppearanceDesc').addEventListener('input', e => { c.appearance.description = e.target.value; persist(); });
   document.getElementById('charPersonality').addEventListener('input', e => { c.personality = e.target.value; persist(); });
   document.getElementById('charBiography').addEventListener('input', e => { c.biography = e.target.value; persist(); });
@@ -952,7 +1032,8 @@ document.getElementById('addCharacterBtn').addEventListener('click', () => {
     speech: '',
     arcNotes: {},
     relationships: [],
-    branchIds: []
+    branchIds: [],
+    groups: []
   };
   p.characters.push(c);
   activeCharacterId = c.id;
@@ -1358,6 +1439,7 @@ function escapeAttr(str) {
 function renderAllPanels() {
   activeChapterId = null;
   activeCharacterId = null;
+  activeCharacterGroups = new Set();
   activeNoteId = null;
   noteSearchQuery = '';
   noteSortMode = 'created';
@@ -1366,6 +1448,7 @@ function renderAllPanels() {
   document.getElementById('noteSort').value = 'created';
   renderChapters();
   renderChapterEditor();
+  renderCharacterGroupCloud();
   renderCharacters();
   renderCharacterDetail();
   renderBranches();

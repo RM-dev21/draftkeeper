@@ -466,7 +466,7 @@ button:disabled {
 
 .tag-chip-empty { color: var(--text-dim); font-size: 13px; font-style: italic; }
 
-.note-list li { flex-direction: column; align-items: stretch; gap: 6px; }
+.tagged-list li { flex-direction: column; align-items: stretch; gap: 6px; }
 
 .note-item-header {
   display: flex;
@@ -524,7 +524,7 @@ button:disabled {
   font-size: 12px;
 }
 
-#noteTagInput {
+#noteTagInput, #charGroupInput {
   flex: 1;
   min-width: 160px;
 }
