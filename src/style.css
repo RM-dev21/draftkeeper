@@ -45,6 +45,17 @@ body {
   letter-spacing: 0.5px;
 }
 
+/* Обёртки вокруг верхней панели (проект-селектор+поиск и «⋮ Ещё»+его
+   содержимое), которые на мобильном сворачиваются при скролле контента
+   вниз (см. .topbar-hidden в мобильном блоке). На десктопе — прозрачный
+   flex-контейнер без overflow:hidden (иначе сломается выпадающий список
+   глобального поиска — он на десктопе намеренно шире своего блока). */
+.mobile-topbar-collapsible-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 .app-version {
   font-size: 11px;
   font-weight: normal;
@@ -1174,6 +1185,44 @@ button:disabled {
 
   .sidebar h1 { display: none; }
 
+  /* Сворачивающийся при скролле топ-бар (проект-селектор, поиск, «⋮ Ещё»):
+     на мобильном каждая половина топ-бара — это grid-строка высотой 1fr,
+     которая анимированно сжимается до 0fr, когда JS (см. app.js) вешает
+     .topbar-hidden на .sidebar при скролле контента вниз, и возвращается
+     к 1fr при скролле вверх/у самого верха страницы. overflow:hidden на
+     *-inner обязателен для анимации (иначе высота grid-строки не влияет
+     на видимость контента) — но именно из-за него абсолютно спозиционированный
+     список результатов поиска пришлось увести в position:fixed ниже,
+     иначе он бы обрезался этим overflow.
+     nav (нижняя навигация) физически лежит между двумя половинами в DOM,
+     но на мобильном она position:fixed и не участвует в раскладке — так что
+     две обёртки можно сворачивать независимо, не трогая её. */
+  .mobile-topbar-collapsible {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+    opacity: 1;
+  }
+  .mobile-topbar-collapsible-inner {
+    gap: 8px;
+    overflow: hidden;
+  }
+  .sidebar.topbar-hidden .mobile-topbar-collapsible {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+
+  /* Список результатов глобального поиска на мобильном — position:fixed
+     (координаты выставляет JS в positionGlobalSearchResults()), а не
+     position:absolute от .global-search-block: иначе его обрежет
+     overflow:hidden обёртки топ-бара выше. */
+  .global-search-results {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    z-index: 260;
+  }
+
   .project-block { display: flex; align-items: center; gap: 8px; }
   .project-block label { display: none; }
   .project-block select { margin-bottom: 0; flex: 1; padding: 10px; font-size: 14px; }
@@ -1373,6 +1422,15 @@ button:disabled {
     align-items: center;
     padding: 6px 10px;
     gap: 6px;
+  }
+
+  /* В альбомной ориентации топ-бар не сворачивается по скроллу (эта
+     раскладка и так уже уплотнена под низкий экран отдельным фиксом) —
+     обёртки становятся прозрачными, project-block/search/«⋮ Ещё» снова
+     обычные flex-элементы .sidebar-строки, как до появления обёрток. */
+  .mobile-topbar-collapsible,
+  .mobile-topbar-collapsible-inner {
+    display: contents;
   }
 
   .project-block { flex: 1 1 220px; }

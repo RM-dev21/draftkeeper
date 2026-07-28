@@ -20,19 +20,23 @@
   <aside class="sidebar">
     <h1>Draftkeeper <span id="appVersion" class="app-version"></span></h1>
 
-    <div class="project-block">
-      <label>Проект</label>
-      <select id="projectSelect"></select>
-      <div class="row">
-        <button id="newProjectBtn">+ Новый</button>
-        <button id="renameProjectBtn">✎</button>
-        <button id="deleteProjectBtn">🗑</button>
-      </div>
-    </div>
+    <div class="mobile-topbar-collapsible">
+      <div class="mobile-topbar-collapsible-inner">
+        <div class="project-block">
+          <label>Проект</label>
+          <select id="projectSelect"></select>
+          <div class="row">
+            <button id="newProjectBtn">+ Новый</button>
+            <button id="renameProjectBtn">✎</button>
+            <button id="deleteProjectBtn">🗑</button>
+          </div>
+        </div>
 
-    <div class="global-search-block">
-      <input id="globalSearch" placeholder="Поиск по всему проекту...">
-      <div id="globalSearchResults" class="global-search-results" style="display:none"></div>
+        <div class="global-search-block">
+          <input id="globalSearch" placeholder="Поиск по всему проекту...">
+          <div id="globalSearchResults" class="global-search-results" style="display:none"></div>
+        </div>
+      </div>
     </div>
 
     <nav>
@@ -44,24 +48,28 @@
       <button id="helpBtn" class="tab"><span class="tab-icon">❓</span><span class="tab-label">Помощь</span></button>
     </nav>
 
-    <button id="sidebarMoreBtn" type="button" class="sidebar-more-btn" aria-expanded="false">⋮ Ещё (экспорт, Google Drive)</button>
+    <div class="mobile-topbar-collapsible">
+      <div class="mobile-topbar-collapsible-inner">
+        <button id="sidebarMoreBtn" type="button" class="sidebar-more-btn" aria-expanded="false">⋮ Ещё (экспорт, Google Drive)</button>
 
-    <div id="sidebarExtra" class="sidebar-extra">
-      <div class="export-block">
-        <button id="exportBtn">⬇ Экспорт проекта (JSON)</button>
-        <button id="importBtn">⬆ Импорт проекта (JSON)</button>
-        <input type="file" id="importFile" accept=".json" hidden>
+        <div id="sidebarExtra" class="sidebar-extra">
+          <div class="export-block">
+            <button id="exportBtn">⬇ Экспорт проекта (JSON)</button>
+            <button id="importBtn">⬆ Импорт проекта (JSON)</button>
+            <input type="file" id="importFile" accept=".json" hidden>
+          </div>
+
+          <div class="gdrive-block">
+            <button id="gdriveSaveBtn">☁️ Сохранить в Google Drive</button>
+            <button id="gdriveLoadBtn">☁️ Загрузить из Google Drive</button>
+            <div id="gdriveStatus" class="gdrive-status"></div>
+          </div>
+
+          <button id="helpBtnMobile" type="button" class="help-btn-mobile">❓ Помощь</button>
+
+          <div class="sidebar-version">Draftkeeper <span class="app-version"></span></div>
+        </div>
       </div>
-
-      <div class="gdrive-block">
-        <button id="gdriveSaveBtn">☁️ Сохранить в Google Drive</button>
-        <button id="gdriveLoadBtn">☁️ Загрузить из Google Drive</button>
-        <div id="gdriveStatus" class="gdrive-status"></div>
-      </div>
-
-      <button id="helpBtnMobile" type="button" class="help-btn-mobile">❓ Помощь</button>
-
-      <div class="sidebar-version">Draftkeeper <span class="app-version"></span></div>
     </div>
   </aside>
 

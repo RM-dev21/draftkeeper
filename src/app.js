@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.10.0';
 document.querySelectorAll('.app-version').forEach(el => { el.textContent = `v${APP_VERSION}`; });
 
 // ===== ХРАНИЛИЩЕ =====
@@ -1019,6 +1019,35 @@ document.addEventListener('click', () => {
     menu.previousElementSibling.setAttribute('aria-expanded', 'false');
   });
 });
+
+// Сворачивающийся при скролле топ-бар (мобильный UX, пункт 1 плана):
+// прячем проект-селектор/поиск/«⋮ Ещё» при скролле контента вниз, показываем
+// обратно при скролле вверх или у самого верха. .topbar-hidden — единственный
+// эффект этого блока, стилизуется только в мобильном media query (см.
+// style.css), так что на десктопе переключение класса ничего не меняет
+// визуально и его не нужно отдельно гасить по ширине экрана.
+// 'scroll' не всплывает — слушаем документ на этапе перехвата (capture),
+// чтобы ловить скролл внутри .content, .list и текстовых полей главы разом.
+(() => {
+  const sidebar = document.querySelector('.sidebar');
+  const sidebarExtra = document.getElementById('sidebarExtra');
+  const lastScrollTop = new WeakMap();
+
+  document.addEventListener('scroll', e => {
+    const target = e.target;
+    if (!(target instanceof Element) || sidebar.contains(target)) return;
+    if (sidebarExtra.classList.contains('open')) return;
+
+    const top = target.scrollTop;
+    const prev = lastScrollTop.has(target) ? lastScrollTop.get(target) : top;
+    lastScrollTop.set(target, top);
+
+    if (top <= 24) { sidebar.classList.remove('topbar-hidden'); return; }
+    const delta = top - prev;
+    if (delta > 4) sidebar.classList.add('topbar-hidden');
+    else if (delta < -4) sidebar.classList.remove('topbar-hidden');
+  }, { capture: true, passive: true });
+})();
 
 document.getElementById('saveVersionBtn').addEventListener('click', () => {
   const p = currentProject();
@@ -2116,8 +2145,22 @@ function computeGlobalSearchResults(q) {
   return groups;
 }
 
+// На мобильном топ-бар может сворачиваться при скролле (см. .topbar-hidden),
+// а обёртка вокруг .global-search-block всегда имеет overflow:hidden (нужен
+// для анимации) — поэтому список результатов там position:fixed относительно
+// вьюпорта, а не position:absolute от своего блока, и координаты приходится
+// выставлять вручную. На десктопе positioning не трогаем — там работает
+// обычный CSS (position:absolute, список шире своего блока).
+function positionGlobalSearchResults() {
+  const container = document.getElementById('globalSearchResults');
+  if (window.innerWidth > 768) { container.style.top = ''; return; }
+  const rect = document.getElementById('globalSearch').getBoundingClientRect();
+  container.style.top = `${rect.bottom + 4}px`;
+}
+
 function renderGlobalSearchResults() {
   const container = document.getElementById('globalSearchResults');
+  positionGlobalSearchResults();
   const q = globalSearchQuery.trim().toLowerCase();
   if (!q) {
     container.style.display = 'none';
