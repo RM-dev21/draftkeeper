@@ -318,6 +318,12 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
+}
+
+#chapterEditorForm {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .editor input, .editor textarea {
@@ -331,7 +337,7 @@ button:disabled {
   resize: none;
 }
 
-#chapterText { flex: 1; line-height: 1.6; }
+#chapterText { flex: 1; line-height: 1.6; min-height: 150px; }
 .notes { height: 90px; color: var(--text-dim); font-style: italic; }
 
 .empty-state {
