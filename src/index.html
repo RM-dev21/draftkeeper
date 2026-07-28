@@ -44,16 +44,20 @@
       <button id="helpBtn" class="tab"><span class="tab-icon">❓</span><span class="tab-label">Помощь</span></button>
     </nav>
 
-    <div class="export-block">
-      <button id="exportBtn">⬇ Экспорт проекта (JSON)</button>
-      <button id="importBtn">⬆ Импорт проекта (JSON)</button>
-      <input type="file" id="importFile" accept=".json" hidden>
-    </div>
+    <button id="sidebarMoreBtn" type="button" class="sidebar-more-btn" aria-expanded="false">⋮ Ещё (экспорт, Google Drive)</button>
 
-    <div class="gdrive-block">
-      <button id="gdriveSaveBtn">☁️ Сохранить в Google Drive</button>
-      <button id="gdriveLoadBtn">☁️ Загрузить из Google Drive</button>
-      <div id="gdriveStatus" class="gdrive-status"></div>
+    <div id="sidebarExtra" class="sidebar-extra">
+      <div class="export-block">
+        <button id="exportBtn">⬇ Экспорт проекта (JSON)</button>
+        <button id="importBtn">⬆ Импорт проекта (JSON)</button>
+        <input type="file" id="importFile" accept=".json" hidden>
+      </div>
+
+      <div class="gdrive-block">
+        <button id="gdriveSaveBtn">☁️ Сохранить в Google Drive</button>
+        <button id="gdriveLoadBtn">☁️ Загрузить из Google Drive</button>
+        <div id="gdriveStatus" class="gdrive-status"></div>
+      </div>
     </div>
   </aside>
 

@@ -191,6 +191,10 @@ button:hover { background: var(--accent-2); }
   line-height: 1.4;
 }
 
+/* На десктопе всегда видно целиком; кнопка-переключатель нужна только на мобильном. */
+.sidebar-more-btn { display: none; }
+.sidebar-extra { display: contents; }
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1150,6 +1154,27 @@ button:disabled {
   .gdrive-block { flex-direction: row; flex-wrap: wrap; padding-top: 8px; }
   .gdrive-block button { flex: 1; padding: 10px 8px; font-size: 12px; }
   .gdrive-status { flex-basis: 100%; }
+
+  /* Экспорт/импорт и Google Drive нужны редко — на мобильном прячем их за
+     кнопкой-переключателем, чтобы не отъедать место у рабочей области. */
+  .sidebar-more-btn {
+    display: block;
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-dim);
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .sidebar-extra {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sidebar-extra.open { display: flex; }
 
   nav {
     position: fixed;

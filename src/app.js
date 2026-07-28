@@ -989,6 +989,14 @@ function openHelpModal() {
 
 document.getElementById('helpBtn').addEventListener('click', openHelpModal);
 
+document.getElementById('sidebarMoreBtn').addEventListener('click', () => {
+  const btn = document.getElementById('sidebarMoreBtn');
+  const extra = document.getElementById('sidebarExtra');
+  const open = extra.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open);
+  btn.textContent = open ? '⋮ Скрыть' : '⋮ Ещё (экспорт, Google Drive)';
+});
+
 document.getElementById('saveVersionBtn').addEventListener('click', () => {
   const p = currentProject();
   const ch = p.chapters.find(c => c.id === activeChapterId);
