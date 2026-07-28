@@ -27,9 +27,11 @@
 ## 4. Создать OAuth Client ID
 1. APIs & Services → Credentials → Create Credentials → OAuth client ID
 2. Application type — Web application
-3. Authorized JavaScript origins — добавь адрес, где будет жить сайт
-   (например `http://localhost:3000` для теста, и позже реальный адрес
-   после того как выложишь на Netlify/Vercel)
+3. Authorized JavaScript origins — добавь:
+   - `http://localhost:8080` (или другой порт, если тестируешь локально
+     через `python3 -m http.server`)
+   - `https://rm-dev21.github.io` — реальный адрес сайта на GitHub Pages
+     (без пути `/draftkeeper` в конце, только сам домен)
 4. Create — скопируй появившийся **Client ID**
 
 ## Что дальше
