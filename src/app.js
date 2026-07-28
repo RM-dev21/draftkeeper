@@ -988,6 +988,7 @@ function openHelpModal() {
 }
 
 document.getElementById('helpBtn').addEventListener('click', openHelpModal);
+document.getElementById('helpBtnMobile').addEventListener('click', openHelpModal);
 
 document.getElementById('sidebarMoreBtn').addEventListener('click', () => {
   const btn = document.getElementById('sidebarMoreBtn');

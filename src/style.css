@@ -57,6 +57,11 @@ body {
    где <h1> скрыт (см. .sidebar h1 в мобильном блоке). */
 .sidebar-version { display: none; }
 
+/* «Помощь» на десктопе остаётся вкладкой в nav; дубль в «⋮ Ещё» нужен
+   только на мобильном, где сама вкладка «Помощь» убрана из нижней
+   навигации (см. мобильный блок ниже). */
+.help-btn-mobile { display: none; }
+
 .project-block label {
   font-size: 12px;
   color: var(--text-dim);
@@ -1220,6 +1225,16 @@ button:disabled {
   }
 
   nav .tab .tab-icon { font-size: 19px; }
+
+  /* «Помощь» нужна редко — убираем из нижней навигации (там и так 6 вкладок,
+     больше рекомендуемых 5), дублирующая кнопка есть в «⋮ Ещё». */
+  nav #helpBtn { display: none; }
+
+  .help-btn-mobile {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
 
   /* Main content scrolls on its own, with room reserved for the fixed bottom nav. */
   .content {
