@@ -93,6 +93,21 @@ body {
 .row { display: flex; gap: 6px; }
 .row button { flex: 1; padding: 6px; }
 
+/* Переименовать/удалить проект — компактные кнопки с подписью под иконкой
+   (тот же приём, что у нижней мобильной навигации: .tab-icon/.tab-label),
+   чтобы новый пользователь понимал их назначение без наведения. */
+.project-icon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.1;
+  padding: 4px 2px;
+}
+.project-icon-btn-icon { font-size: 14px; }
+.project-icon-btn-label { font-size: 9px; color: var(--text-dim); }
+
 .global-search-block { position: relative; }
 
 .global-search-block input {
@@ -1199,6 +1214,9 @@ button:disabled {
   .project-block select { margin-bottom: 0; flex: 1; padding: 10px; font-size: 14px; }
   .row { flex-shrink: 0; }
   .row button { padding: 10px 12px; font-size: 14px; }
+  .row button.project-icon-btn { padding: 6px 4px; }
+  .project-icon-btn-icon { font-size: 16px; }
+  .project-icon-btn-label { font-size: 9px; }
 
   .export-block { flex-direction: row; margin-top: 0; gap: 8px; }
   .export-block button { flex: 1; padding: 10px 8px; font-size: 12px; }
