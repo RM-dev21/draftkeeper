@@ -53,6 +53,10 @@ body {
   vertical-align: middle;
 }
 
+/* На десктопе версия и так видна в <h1>; этот дубль нужен только на мобильном,
+   где <h1> скрыт (см. .sidebar h1 в мобильном блоке). */
+.sidebar-version { display: none; }
+
 .project-block label {
   font-size: 12px;
   color: var(--text-dim);
@@ -1181,6 +1185,13 @@ button:disabled {
   }
 
   .sidebar-extra.open { display: flex; }
+
+  .sidebar-version {
+    display: block;
+    text-align: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
 
   nav {
     position: fixed;

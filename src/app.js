@@ -4,7 +4,7 @@
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
 const APP_VERSION = '1.9.0';
-document.getElementById('appVersion').textContent = `v${APP_VERSION}`;
+document.querySelectorAll('.app-version').forEach(el => { el.textContent = `v${APP_VERSION}`; });
 
 // ===== ХРАНИЛИЩЕ =====
 // localStorage работает и в браузере, и в Electron (данные пишутся на диск автоматически)
