@@ -997,6 +997,28 @@ document.getElementById('sidebarMoreBtn').addEventListener('click', () => {
   btn.textContent = open ? '⋮ Скрыть' : '⋮ Ещё (экспорт, Google Drive)';
 });
 
+// Компактное «⋯»-меню для редких действий (шапка «Глав», тулбар главы).
+// Один делегированный обработчик на все .mobile-overflow-btn на странице.
+document.querySelectorAll('.mobile-overflow-btn').forEach(btn => {
+  const menu = btn.nextElementSibling;
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = menu.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open);
+    document.querySelectorAll('.mobile-overflow-menu.open').forEach(m => {
+      if (m !== menu) { m.classList.remove('open'); m.previousElementSibling.setAttribute('aria-expanded', 'false'); }
+    });
+  });
+  menu.addEventListener('click', () => { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); });
+});
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.mobile-overflow-menu.open').forEach(menu => {
+    menu.classList.remove('open');
+    menu.previousElementSibling.setAttribute('aria-expanded', 'false');
+  });
+});
+
 document.getElementById('saveVersionBtn').addEventListener('click', () => {
   const p = currentProject();
   const ch = p.chapters.find(c => c.id === activeChapterId);

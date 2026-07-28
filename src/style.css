@@ -195,6 +195,12 @@ button:hover { background: var(--accent-2); }
 .sidebar-more-btn { display: none; }
 .sidebar-extra { display: contents; }
 
+/* Переиспользуемое «⋯»-меню для редких действий в заголовках/тулбарах.
+   На десктопе прозрачно (кнопки идут в общем ряду как обычно). */
+.mobile-overflow { display: contents; }
+.mobile-overflow-btn { display: none; }
+.mobile-overflow-menu { display: contents; }
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1223,8 +1229,47 @@ button:disabled {
   }
 
   .chapter-title-row { flex-wrap: wrap; }
-  .chapter-title-row input { flex: 1 1 100%; }
+  .chapter-title-row #chapterBackBtn { order: 1; }
+  .chapter-title-row .mobile-overflow { order: 2; }
+  .chapter-title-row input { flex: 1 1 100%; order: 3; }
   .chapter-title-row #saveVersionBtn, .chapter-title-row #showVersionsBtn, .chapter-title-row #exportChapterWordBtn { font-size: 12px; padding: 8px 10px; }
+
+  /* Редкие действия («Сохранить версию», экспорт романа/главы в Word и т.п.)
+     прячем за компактной кнопкой «⋯», чтобы не отнимать место у рабочей области. */
+  .mobile-overflow { position: relative; display: inline-flex; }
+
+  .mobile-overflow-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-height: 40px;
+    font-size: 18px;
+    padding: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+  }
+
+  .mobile-overflow-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+    min-width: 220px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+    z-index: 60;
+  }
+
+  .mobile-overflow-menu.open { display: flex; }
+  .mobile-overflow-menu button { width: 100%; text-align: left; }
 
   /* Fullscreen editor: hide everything in the panel except the split itself while a
      chapter/character/note is open, so the editor gets the whole screen. */

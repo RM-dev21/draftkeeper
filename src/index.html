@@ -68,7 +68,12 @@
       <div class="panel-header">
         <h2>Главы</h2>
         <div class="panel-header-actions">
-          <button id="exportNovelWordBtn">📚 Экспорт всего романа в Word</button>
+          <div class="mobile-overflow">
+            <button type="button" class="mobile-overflow-btn" aria-expanded="false" aria-label="Ещё действия">⋯</button>
+            <div class="mobile-overflow-menu">
+              <button id="exportNovelWordBtn">📚 Экспорт всего романа в Word</button>
+            </div>
+          </div>
           <button id="addPartBtn" type="button">+ Часть</button>
           <button id="addChapterBtn">+ Новая глава</button>
         </div>
@@ -87,9 +92,14 @@
             <div class="chapter-title-row">
               <button id="chapterBackBtn" type="button" class="mobile-back-btn">← Назад</button>
               <input id="chapterTitle" placeholder="Название главы">
-              <button id="saveVersionBtn" type="button">💾 Сохранить версию</button>
-              <button id="showVersionsBtn" type="button">🕐 История версий</button>
-              <button id="exportChapterWordBtn" type="button">📄 Экспорт в Word</button>
+              <div class="mobile-overflow">
+                <button type="button" class="mobile-overflow-btn" aria-expanded="false" aria-label="Ещё действия">⋯</button>
+                <div class="mobile-overflow-menu">
+                  <button id="saveVersionBtn" type="button">💾 Сохранить версию</button>
+                  <button id="showVersionsBtn" type="button">🕐 История версий</button>
+                  <button id="exportChapterWordBtn" type="button">📄 Экспорт в Word</button>
+                </div>
+              </div>
             </div>
             <div class="chapter-meta-row">
               <label class="chapter-meta-field">

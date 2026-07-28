@@ -5,7 +5,7 @@
 // Важно: при любом изменении файлов приложения (app.js/style.css/index.html/...)
 // увеличивайте CACHE_VERSION ниже — иначе у уже установивших приложение
 // пользователей продолжит отдаваться старая закэшированная версия.
-const CACHE_VERSION = 'v20';
+const CACHE_VERSION = 'v21';
 const CACHE_NAME = `draftkeeper-${CACHE_VERSION}`;
 
 const APP_SHELL = [
