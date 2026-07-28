@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 document.querySelectorAll('.app-version').forEach(el => { el.textContent = `v${APP_VERSION}`; });
 
 // ===== ХРАНИЛИЩЕ =====
@@ -439,7 +439,7 @@ document.querySelectorAll('.tab[data-tab]').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
     // При заходе на вкладку всегда начинаем со списка (актуально для мобильной раскладки).
-    ['chapters', 'characters', 'notes'].forEach(id => setMobileFullscreenEditing(id, false));
+    ['chapters', 'characters', 'branches', 'notes'].forEach(id => setMobileFullscreenEditing(id, false));
     // Карточка персонажа зависит от актуального списка глав и веток —
     // перерисовываем при каждом открытии вкладки, а не только по своим событиям.
     if (btn.dataset.tab === 'characters') {
@@ -456,7 +456,8 @@ document.querySelectorAll('.tab[data-tab]').forEach(btn => {
     // Карточка ветки показывает привязанных персонажей — освежаем, если их
     // привязку меняли на вкладке "Персонажи".
     if (btn.dataset.tab === 'branches') {
-      renderBranches();
+      renderBranchList();
+      renderBranchDetail();
     }
     // Список событий ссылается на ветки (цвет маркера, выпадающий список) —
     // освежаем, если ветки успели измениться на своей вкладке.
@@ -1536,6 +1537,7 @@ document.getElementById('addCharacterBtn').addEventListener('click', () => {
 });
 
 // ===== СЮЖЕТНЫЕ ВЕТКИ =====
+let activeBranchId = null;
 // UI-состояние (не персистится): какие ветки свёрнуты в дереве.
 let collapsedBranchIds = new Set();
 
@@ -1569,16 +1571,10 @@ function getEffectiveParentId(b, byId) {
   return b.parentId && byId.has(b.parentId) ? b.parentId : null;
 }
 
-function renderBranches() {
-  const p = currentProject();
-  const map = document.getElementById('branchMap');
-  map.innerHTML = '';
-
-  if (!p.branches.length) {
-    map.innerHTML = '<p class="hint">Веток пока нет.</p>';
-    return;
-  }
-
+// Порядок веток для списка — корни, затем дети каждой рекурсивно (учитывая
+// свёрнутые узлы), с глубиной для отступа. Тот же byParent/getEffectiveParentId,
+// что и раньше в древовидном рендере, просто теперь строим плоский список.
+function flattenBranchTree(p) {
   const byId = new Map(p.branches.map(b => [b.id, b]));
   const byParent = new Map();
   p.branches.forEach(b => {
@@ -1587,17 +1583,87 @@ function renderBranches() {
     byParent.get(parentId).push(b);
   });
 
-  (byParent.get(null) || []).forEach(b => map.appendChild(renderBranchNode(b, byParent)));
+  const result = [];
+  function walk(parentId, depth) {
+    (byParent.get(parentId) || []).forEach(b => {
+      const hasChildren = (byParent.get(b.id) || []).length > 0;
+      const collapsed = collapsedBranchIds.has(b.id);
+      result.push({ branch: b, depth, hasChildren, collapsed });
+      if (hasChildren && !collapsed) walk(b.id, depth + 1);
+    });
+  }
+  walk(null, 0);
+  return result;
 }
 
-function renderBranchNode(b, byParent) {
+function renderBranchList() {
   const p = currentProject();
-  const wrap = document.createElement('div');
-  wrap.className = 'branch-branch';
+  const list = document.getElementById('branchList');
+  list.innerHTML = '';
 
-  const children = byParent.get(b.id) || [];
-  const hasChildren = children.length > 0;
-  const collapsed = collapsedBranchIds.has(b.id);
+  flattenBranchTree(p).forEach(({ branch: b, depth, hasChildren, collapsed }) => {
+    const li = document.createElement('li');
+    li.className = b.id === activeBranchId ? 'active' : '';
+    li.style.marginLeft = (depth * 16) + 'px';
+    li.innerHTML = `
+      <div class="branch-item-row">
+        ${hasChildren ? `<button type="button" class="b-toggle" title="${collapsed ? 'Развернуть' : 'Свернуть'}">${collapsed ? '▶' : '▼'}</button>` : '<span class="b-toggle-spacer"></span>'}
+        <span class="branch-item-name">${escapeHtml(b.name || 'Без названия')}</span>
+      </div>
+      <span class="del" data-id="${b.id}">✕</span>
+    `;
+    li.addEventListener('click', e => {
+      if (e.target.classList.contains('del') || e.target.classList.contains('b-toggle')) return;
+      activeBranchId = b.id;
+      setMobileFullscreenEditing('branches', true);
+      renderBranchList();
+      renderBranchDetail();
+    });
+    if (hasChildren) {
+      li.querySelector('.b-toggle').addEventListener('click', e => {
+        e.stopPropagation();
+        if (collapsed) collapsedBranchIds.delete(b.id); else collapsedBranchIds.add(b.id);
+        renderBranchList();
+      });
+    }
+    li.querySelector('.del').addEventListener('click', e => {
+      e.stopPropagation();
+      if (!confirm('Удалить ветку?')) return;
+      p.branches = p.branches.filter(x => x.id !== b.id);
+      p.branches.forEach(x => { if (x.parentId === b.id) x.parentId = null; });
+      p.characters.forEach(char => { char.branchIds = char.branchIds.filter(id => id !== b.id); });
+      p.notes.forEach(note => { note.links.branchIds = note.links.branchIds.filter(id => id !== b.id); });
+      p.timeline.forEach(ev => { if (ev.branchId === b.id) ev.branchId = null; });
+      collapsedBranchIds.delete(b.id);
+      if (activeBranchId === b.id) activeBranchId = null;
+      setMobileFullscreenEditing('branches', false);
+      persist();
+      renderBranchList();
+      renderBranchDetail();
+      renderTimeline();
+    });
+    list.appendChild(li);
+  });
+
+  if (!activeBranchId && p.branches.length) activeBranchId = p.branches[0].id;
+  if (!p.branches.length) setSplitMobileDetail('branches', true);
+}
+
+function renderBranchDetail() {
+  const p = currentProject();
+  const b = p.branches.find(x => x.id === activeBranchId);
+  const emptyEl = document.getElementById('branchEmptyState');
+  const detailEl = document.getElementById('branchDetail');
+
+  if (!b) {
+    detailEl.style.display = 'none';
+    emptyEl.style.display = 'flex';
+    detailEl.innerHTML = '';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  detailEl.style.display = 'flex';
 
   const excluded = new Set([b.id, ...getBranchDescendantIds(b.id, p.branches)]);
   const options = p.branches
@@ -1610,62 +1676,51 @@ function renderBranchNode(b, byParent) {
     ? linkedChars.map(c => `<span class="branch-char-chip">${escapeHtml(c.name || 'Без имени')}</span>`).join('')
     : '<span class="hint">Персонажи не привязаны</span>';
 
-  const node = document.createElement('div');
-  node.className = 'branch-node';
-  node.dataset.branchId = b.id;
-  node.innerHTML = `
-    <div class="branch-node-head">
-      ${hasChildren ? `<button class="b-toggle" title="${collapsed ? 'Развернуть' : 'Свернуть'}">${collapsed ? '▶' : '▼'}</button>` : '<span class="b-toggle-spacer"></span>'}
-      <input class="b-name" placeholder="Название ветки" value="${escapeAttr(b.name)}">
-      <button class="b-del" title="Удалить ветку">✕</button>
-    </div>
-    <textarea class="b-desc" placeholder="Что происходит в этой ветке">${escapeHtml(b.desc)}</textarea>
-    <select class="b-parent">
+  detailEl.innerHTML = `
+    <button type="button" id="branchBackBtn" class="mobile-back-btn">← Назад к списку</button>
+    <input id="branchName" placeholder="Название ветки" value="${escapeAttr(b.name)}">
+
+    <label class="field-label">Родительская ветка</label>
+    <select id="branchParentSelect">
       <option value="">— нет родительской ветки —</option>
       ${options}
     </select>
-    <div class="branch-chars">${charChips}</div>
+
+    <label class="field-label">Описание</label>
+    <textarea id="branchDesc" class="char-textarea" placeholder="Что происходит в этой ветке">${escapeHtml(b.desc)}</textarea>
+
+    <div class="char-section">
+      <h3>Персонажи в этой ветке</h3>
+      <div class="branch-chars">${charChips}</div>
+    </div>
   `;
-  node.querySelector('.b-name').addEventListener('input', e => { b.name = e.target.value; persist(); });
-  node.querySelector('.b-name').addEventListener('blur', () => { renderBranches(); });
-  node.querySelector('.b-desc').addEventListener('input', e => { b.desc = e.target.value; persist(); });
-  node.querySelector('.b-parent').addEventListener('change', e => { b.parentId = e.target.value || null; persist(); renderBranches(); });
-  node.querySelector('.b-del').addEventListener('click', () => {
-    if (!confirm('Удалить ветку?')) return;
-    p.branches = p.branches.filter(x => x.id !== b.id);
-    p.branches.forEach(x => { if (x.parentId === b.id) x.parentId = null; });
-    p.characters.forEach(char => { char.branchIds = char.branchIds.filter(id => id !== b.id); });
-    p.notes.forEach(note => { note.links.branchIds = note.links.branchIds.filter(id => id !== b.id); });
-    p.timeline.forEach(ev => { if (ev.branchId === b.id) ev.branchId = null; });
-    collapsedBranchIds.delete(b.id);
+
+  document.getElementById('branchBackBtn').addEventListener('click', () => setMobileFullscreenEditing('branches', false));
+  document.getElementById('branchName').addEventListener('input', e => {
+    b.name = e.target.value;
     persist();
-    renderBranches();
-    renderTimeline();
+    renderBranchList();
   });
-  if (hasChildren) {
-    node.querySelector('.b-toggle').addEventListener('click', () => {
-      if (collapsed) collapsedBranchIds.delete(b.id); else collapsedBranchIds.add(b.id);
-      renderBranches();
-    });
-  }
-
-  wrap.appendChild(node);
-
-  if (hasChildren && !collapsed) {
-    const childrenWrap = document.createElement('div');
-    childrenWrap.className = 'branch-children';
-    children.forEach(child => childrenWrap.appendChild(renderBranchNode(child, byParent)));
-    wrap.appendChild(childrenWrap);
-  }
-
-  return wrap;
+  document.getElementById('branchParentSelect').addEventListener('change', e => {
+    b.parentId = e.target.value || null;
+    persist();
+    renderBranchList();
+  });
+  document.getElementById('branchDesc').addEventListener('input', e => {
+    b.desc = e.target.value;
+    persist();
+  });
 }
 
 document.getElementById('addBranchBtn').addEventListener('click', () => {
   const p = currentProject();
-  p.branches.push({ id: uid(), name: '', desc: '', parentId: null });
+  const b = { id: uid(), name: '', desc: '', parentId: null };
+  p.branches.push(b);
+  activeBranchId = b.id;
+  setMobileFullscreenEditing('branches', true);
   persist();
-  renderBranches();
+  renderBranchList();
+  renderBranchDetail();
 });
 
 // ===== ТАЙМЛАЙН =====
@@ -2209,6 +2264,7 @@ function goToSearchResult(type, id) {
   if (type === 'chapters') activeChapterId = id;
   if (type === 'characters') activeCharacterId = id;
   if (type === 'notes') activeNoteId = id;
+  if (type === 'branches') activeBranchId = id;
 
   const tabBtn = document.querySelector(`.tab[data-tab="${type}"]`);
   if (tabBtn) tabBtn.click();
@@ -2226,7 +2282,9 @@ function goToSearchResult(type, id) {
     renderNoteList();
     renderNoteDetail();
   } else if (type === 'branches') {
-    scrollToAndHighlight(`.branch-node[data-branch-id="${id}"]`);
+    setMobileFullscreenEditing('branches', true);
+    renderBranchList();
+    renderBranchDetail();
   } else if (type === 'timeline') {
     scrollToAndHighlight(`.timeline-row[data-event-id="${id}"]`);
   }
@@ -2273,6 +2331,7 @@ function renderAllPanels() {
   document.getElementById('globalSearchResults').style.display = 'none';
   activeCharacterId = null;
   activeCharacterGroups = new Set();
+  activeBranchId = null;
   activeNoteId = null;
   noteSearchQuery = '';
   noteSortMode = 'created';
@@ -2284,7 +2343,8 @@ function renderAllPanels() {
   renderCharacterGroupCloud();
   renderCharacters();
   renderCharacterDetail();
-  renderBranches();
+  renderBranchList();
+  renderBranchDetail();
   renderTimeline();
   renderNoteTagCloud();
   renderNoteList();

@@ -620,35 +620,21 @@ button:disabled {
 
 .hint { font-size: 13px; color: var(--text-dim); }
 
-/* BRANCHES (indented tree by parentId, collapsible) */
-.branch-map {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.branch-branch {
-  display: flex;
-  flex-direction: column;
-}
-
-.branch-node {
-  background: var(--panel);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  padding: 12px;
-  max-width: 420px;
-}
-
-.branch-node-head {
+/* BRANCHES (list -> detail, same pattern as chapters/characters/notes; list
+   items are indented by tree depth via inline margin-left, see renderBranchList) */
+.branch-item-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  min-width: 0;
+  flex: 1;
 }
 
-.branch-node-head .b-name { flex: 1; margin-bottom: 0; }
-.branch-node-head .b-del { flex-shrink: 0; }
+.branch-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .b-toggle {
   flex-shrink: 0;
@@ -666,20 +652,6 @@ button:disabled {
 
 .b-toggle-spacer { display: inline-block; width: 24px; flex-shrink: 0; }
 
-.branch-node input, .branch-node textarea, .branch-node select {
-  width: 100%;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 6px 8px;
-  margin-bottom: 6px;
-  font-family: inherit;
-  font-size: 13px;
-}
-
-.branch-node textarea { height: 60px; resize: vertical; }
-
 .branch-chars {
   display: flex;
   flex-wrap: wrap;
@@ -693,16 +665,6 @@ button:disabled {
   padding: 3px 10px;
   font-size: 12px;
   color: var(--text-dim);
-}
-
-.branch-children {
-  margin-top: 10px;
-  margin-left: 12px;
-  padding-left: 16px;
-  border-left: 2px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 /* TIMELINE (vertical ribbon with markers, colored by linked branch) */
@@ -814,6 +776,15 @@ button:disabled {
   padding-right: 6px;
 }
 #noteDetail > * { flex-shrink: 0; }
+
+#branchDetail {
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+#branchDetail > * { flex-shrink: 0; }
 
 .notes-toolbar {
   display: flex;
@@ -1364,10 +1335,10 @@ button:disabled {
   .mobile-overflow-menu button { width: 100%; text-align: left; }
 
   /* Fullscreen editor: hide everything in the panel except the split itself while a
-     chapter/character/note is open, so the editor gets the whole screen. */
+     chapter/character/branch/note is open, so the editor gets the whole screen. */
   .panel.mobile-detail-active > *:not(.split) { display: none; }
 
-  /* Master-detail panels (chapters/characters/notes): show one pane at a time, full screen. */
+  /* Master-detail panels (chapters/characters/branches/notes): show one pane at a time, full screen. */
   .panel .split {
     display: flex;
     flex-direction: column;
@@ -1400,10 +1371,6 @@ button:disabled {
   /* Larger tap targets throughout */
   button { min-height: 40px; }
   .branch-check, .tag-chip, .note-item-tag { padding: 10px 14px; }
-
-  /* Non-split panels: let content reflow to full width on narrow screens. */
-  .branch-node { max-width: 100%; }
-  .branch-children { margin-left: 6px; padding-left: 10px; }
 
   .notes-toolbar { flex-direction: column; }
   .notes-toolbar select { width: 100%; }

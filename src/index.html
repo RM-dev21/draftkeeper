@@ -160,7 +160,16 @@
         <h2>Сюжетные ветки</h2>
         <button id="addBranchBtn" class="btn-primary">+ Новая ветка</button>
       </div>
-      <div id="branchMap" class="branch-map"></div>
+      <div class="split">
+        <ul id="branchList" class="list"></ul>
+        <div class="editor" style="position:relative">
+          <div id="branchEmptyState" class="empty-state" style="display:flex">
+            <p>В этом проекте пока нет веток.</p>
+            <p class="hint">Нажмите «+ Новая ветка» слева, чтобы начать.</p>
+          </div>
+          <div id="branchDetail" style="display:none"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ТАЙМЛАЙН -->
