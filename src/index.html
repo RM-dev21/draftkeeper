@@ -75,11 +75,11 @@
           <div class="mobile-overflow">
             <button type="button" class="mobile-overflow-btn" aria-expanded="false" aria-label="Ещё действия">⋯</button>
             <div class="mobile-overflow-menu">
-              <button id="exportNovelWordBtn">📚 Экспорт всего романа в Word</button>
+              <button id="exportNovelWordBtn" class="btn-outline">📚 Экспорт всего романа в Word</button>
             </div>
           </div>
-          <button id="addPartBtn" type="button">+ Часть</button>
-          <button id="addChapterBtn">+ Новая глава</button>
+          <button id="addPartBtn" type="button" class="btn-outline">+ Часть</button>
+          <button id="addChapterBtn" class="btn-primary">+ Новая глава</button>
         </div>
       </div>
       <div class="notes-toolbar">
@@ -99,9 +99,9 @@
               <div class="mobile-overflow">
                 <button type="button" class="mobile-overflow-btn" aria-expanded="false" aria-label="Ещё действия">⋯</button>
                 <div class="mobile-overflow-menu">
-                  <button id="saveVersionBtn" type="button">💾 Сохранить версию</button>
-                  <button id="showVersionsBtn" type="button">🕐 История версий</button>
-                  <button id="exportChapterWordBtn" type="button">📄 Экспорт в Word</button>
+                  <button id="saveVersionBtn" type="button" class="btn-outline">💾 Сохранить версию</button>
+                  <button id="showVersionsBtn" type="button" class="btn-outline">🕐 История версий</button>
+                  <button id="exportChapterWordBtn" type="button" class="btn-outline">📄 Экспорт в Word</button>
                 </div>
               </div>
             </div>
@@ -131,7 +131,7 @@
     <section id="characters" class="panel">
       <div class="panel-header">
         <h2>Персонажи</h2>
-        <button id="addCharacterBtn">+ Новый персонаж</button>
+        <button id="addCharacterBtn" class="btn-primary">+ Новый персонаж</button>
       </div>
       <div id="characterGroupCloud" class="tag-cloud"></div>
       <div class="split">
@@ -150,7 +150,7 @@
     <section id="branches" class="panel">
       <div class="panel-header">
         <h2>Сюжетные ветки</h2>
-        <button id="addBranchBtn">+ Новая ветка</button>
+        <button id="addBranchBtn" class="btn-primary">+ Новая ветка</button>
       </div>
       <div id="branchMap" class="branch-map"></div>
     </section>
@@ -159,7 +159,7 @@
     <section id="timeline" class="panel">
       <div class="panel-header">
         <h2>Таймлайн событий</h2>
-        <button id="addEventBtn">+ Новое событие</button>
+        <button id="addEventBtn" class="btn-primary">+ Новое событие</button>
       </div>
       <div id="timelineList" class="timeline"></div>
     </section>
@@ -168,7 +168,7 @@
     <section id="notes" class="panel">
       <div class="panel-header">
         <h2>Заметки</h2>
-        <button id="addNoteBtn">+ Новая заметка</button>
+        <button id="addNoteBtn" class="btn-primary">+ Новая заметка</button>
       </div>
       <div class="notes-toolbar">
         <input id="noteSearch" placeholder="Поиск по названию и тексту...">

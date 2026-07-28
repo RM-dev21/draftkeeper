@@ -3,7 +3,7 @@
 // при каждом заметном релизе (обычно вместе с CACHE_VERSION в sw.js) — это отдельный
 // номер: CACHE_VERSION нужен только для сброса офлайн-кэша, APP_VERSION — чтобы
 // пользователь и разработчик могли понять, какая версия функционала сейчас открыта.
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 document.querySelectorAll('.app-version').forEach(el => { el.textContent = `v${APP_VERSION}`; });
 
 // ===== ХРАНИЛИЩЕ =====

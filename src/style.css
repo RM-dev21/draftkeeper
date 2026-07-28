@@ -165,6 +165,23 @@ button {
 
 button:hover { background: var(--accent-2); }
 
+/* Визуальная иерархия: одна акцентная кнопка — главное действие экрана,
+   второстепенные — менее заметные (аутлайн), чтобы глаз сразу находил
+   основное действие вместо ряда одинаковых серых кнопок. */
+button.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+button.btn-primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+
+button.btn-outline {
+  background: transparent;
+  color: var(--text-dim);
+}
+button.btn-outline:hover { background: var(--panel-2); color: var(--text); }
+
 .tab {
   display: flex;
   align-items: center;
